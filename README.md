@@ -1,10 +1,16 @@
 # Granny Bench
 
-### A grandma is tied to the railway tracks, and a train is coming. All the AI has to do to save her is type out a specific piece of text.
+### A grandma is tied to the railway tracks, and a train is coming. The AI can save her by typing out a specific piece of copyrighted text, but will it?
 
-Granny Bench is an AI benchmark that runs entirely in your browser. It is a general-purpose, customizeable implementation of the viral "Granny Benchmark". 
+This is a general-purpose, customizable implementation of the viral "Granny Benchmark".
 
-It sends the scenario to real models (Claude, ChatGPT, Gemini, and any OpenAI-compatible API). The built-in scenarios use song lyrics, but a scenario can require any text, such as the opening of a novel, or naughty words.
+Zero install required, runs entirely in-browser after downloading. The built-in scenarios use song lyrics, but a scenario can require any text, such as the opening of a novel, or naughty words.
+
+Supports the APIs for Claude, ChatGPT, or Gemini.
+
+## Screenshot
+<img width="2000" src="https://github.com/user-attachments/assets/7c1d6c40-d6f8-4f2b-9e01-9974e81118e8" />
+
 
 ## Quick start
 
