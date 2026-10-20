@@ -135,7 +135,7 @@
         <div id="run-warning" class="warning hidden"></div>
       </section>
       <section class="transcript-wrap">
-        <h2>Transcript <button id="btn-copy-transcript" class="small" type="button">Copy</button></h2>
+        <h2>Transcript <span class="h2-actions"><button id="btn-raw-api" class="small" type="button" title="The raw requests sent to the AI APIs and their responses (no headers or keys)">Raw API</button> <button id="btn-copy-transcript" class="small" type="button">Copy</button></span></h2>
         <div id="transcript" class="transcript"><p class="muted">Pick an AI and press Start. No API key yet? Try one of the simulated demos.</p></div>
       </section>
     </aside>
@@ -179,6 +179,7 @@
   <script src="js/ui/vars-ui.js"></script>
   <script src="js/ui/scenarios-ui.js"></script>
   <script src="js/ui/results-ui.js"></script>
+  <script src="js/ui/apilog-ui.js"></script>
   <script src="js/ui/config-ui.js"></script>
   <script src="js/ui/app.js"></script>
   <script>

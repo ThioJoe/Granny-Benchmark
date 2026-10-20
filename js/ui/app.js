@@ -336,6 +336,7 @@
       U.$('#btn-edit-scenario').addEventListener('click', () => GB.ConfigUI.open('scenarios', { scenarioId: S.data.activeScenarioId }));
       U.$('#btn-vars').addEventListener('click', () => GB.VarsUI.open(S.activeScenario()));
       U.$('#chk-voices').addEventListener('change', (e) => { S.data.voice.enabled = e.target.checked; S.save(); this._muteIcon(); if (!e.target.checked) GB.TTS.stopAll(); });
+      U.$('#btn-raw-api').addEventListener('click', () => GB.ApiLogUI.open());
       U.$('#btn-copy-transcript').addEventListener('click', () => {
         const txt = this.transcriptText();
         if (!txt) { U.toast('Nothing to copy yet'); return; }
@@ -528,7 +529,7 @@
         onDelta(full);
         if (cur) { cur.querySelector('.t-text').textContent = full; follow(); }
       };
-      ev.on('ai', (t, r) => {
+      ev.on('ai', (t, r, logId) => {
         const el = cur;
         cur = null;
         if (!el) return;
@@ -541,7 +542,7 @@
         if (r.usage && r.usage.reasoning) meta.push(r.usage.reasoning + ' reasoning');
         if (r.finishReason) meta.push(String(r.finishReason));
         if (r.blocked && r.ai) meta.push('⛔ cut off by the provider: ' + (r.blockDetail || r.blockKind));
-        el.appendChild(h('div.t-meta', meta.join(' · ')));
+        el.appendChild(h('div.t-meta', meta.join(' · '), logId ? [' · ', h('button.linkish', { type: 'button', title: 'The raw request and response for this reply', onclick: () => GB.ApiLogUI.open(logId) }, 'raw API')] : null));
       });
       ev.on('verdict', (t, r) => {
         if (RU.showsVerdict(r.verdict)) turnEls[t.n].appendChild(RU.verdictEl(r.verdict));

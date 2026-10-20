@@ -111,7 +111,9 @@
     return new ApiError(kind, prefix + ': ' + msg, { status, retryAfter, host: hostOf(url) });
   }
 
-  async function doFetch(url, init, signal) {
+  // capture: a recorder from ApiLog.begin (completion requests), or nothing.
+  async function doFetch(url, init, signal, capture) {
+    if (capture) capture.request(url, init);
     let res;
     try {
       res = await fetch(url, Object.assign({}, init, { signal }));
@@ -121,9 +123,87 @@
         'Could not reach ' + hostOf(url) + '. This is usually a network problem or the server not allowing ' +
         'browser (CORS) requests from a local file. Also double-check the API key and base URL.', { host: hostOf(url) });
     }
+    if (capture) capture.response(res);
     if (!res.ok) throw await errorFromResponse(res, url);
     return res;
   }
+
+  // ---------------------------------------------------------------------------
+  // Raw exchange log, for the Arena's "Raw API" viewer: the URL and body of each completion request and the
+  // response as it arrived. Request headers are never recorded (they carry the API keys), credentials in a
+  // URL are hidden, and the key itself is blanked out wherever it shows up. Kept in memory for this tab only.
+  // ---------------------------------------------------------------------------
+  const LOG_MAX = 60;              // exchanges kept (the oldest go first)
+  const LOG_TEXT_MAX = 1500000;    // characters kept of each response
+  const SECRET_PARAM = /^(?:key|api[-_]?key|access[-_]?token|token|auth|authorization|secret|password|sig|signature)$/i;
+
+  // The URL as sent, without a user:password@ part or the values of key-like query parameters.
+  function safeUrl(url) {
+    return String(url)
+      .replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/?#@]*@/i, '$1')
+      .replace(/([?&;])([^=&#;]+)=([^&#;]*)/g, (m, sep, name) => (SECRET_PARAM.test(name) ? sep + name + '=HIDDEN' : m));
+  }
+
+  const ApiLog = {
+    max: LOG_MAX,
+    entries: [],
+    events: new U.Emitter(),   // 'change' (entry, or null when cleared)
+    _seq: 0,
+    get(id) { return this.entries.find((e) => e.id === id) || null; },
+    clear() { this.entries.length = 0; this.events.emit('change', null); },
+
+    // Start recording one exchange. key is only used to blank it out; it is not stored.
+    begin(info, key) {
+      const e = Object.assign({ id: ++this._seq, at: Date.now(), method: '', url: '', request: '', status: null, response: '', state: 'sending', error: '', ms: null }, info);
+      this.entries.push(e);
+      if (this.entries.length > LOG_MAX) this.entries.splice(0, this.entries.length - LOG_MAX);
+      const hide = (s) => (key && key.length >= 8 && s.indexOf(key) >= 0 ? s.split(key).join('[API key hidden]') : s);
+      const t0 = performance.now();
+      let raw = null, timer = null;
+      const flush = () => {
+        clearTimeout(timer); timer = null;
+        if (raw != null) e.response = hide(raw.length > LOG_TEXT_MAX ? raw.slice(0, LOG_TEXT_MAX) + '\n[... the rest is not kept: the response is longer than the log holds]' : raw);
+        this.events.emit('change', e);
+      };
+      const later = () => { if (!timer) timer = setTimeout(flush, 250); };
+      this.events.emit('change', e);
+      return {
+        entry: e,
+        request(url, init) {
+          e.method = (init && init.method) || 'GET';
+          e.url = hide(safeUrl(url));
+          e.request = hide(init && typeof init.body === 'string' ? init.body : '');
+          later();
+        },
+        // Reads a copy of the response body as it streams in.
+        response(res) {
+          e.status = res.status;
+          if (e.state === 'sending') e.state = 'receiving';
+          raw = '';
+          let copy;
+          try { copy = res.clone(); } catch (err) { return; }
+          (async () => {
+            const reader = copy.body.getReader(), dec = new TextDecoder();
+            for (;;) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              if (raw.length <= LOG_TEXT_MAX) raw += dec.decode(value, { stream: true });
+              later();
+            }
+            raw += dec.decode();
+          })().catch(() => {}).then(flush);
+        },
+        // state: 'done' | 'error' | 'aborted'. text: the reply, for demos (they send nothing).
+        done(state, error, text) {
+          e.state = state;
+          e.error = error ? hide(String(error)) : '';
+          e.ms = Math.round(performance.now() - t0);
+          if (raw == null && text != null) raw = String(text);
+          flush();
+        },
+      };
+    },
+  };
 
   function parseExtra(profile) {
     if (!profile.extraBody || !String(profile.extraBody).trim()) return null;
@@ -164,7 +244,7 @@
         'anthropic-dangerous-direct-browser-access': 'true',
       }, parseHeaders(prov.extraHeaders));
 
-      const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }, req.signal);
+      const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }, req.signal, req.capture);
       const out = { text: '', finishReason: null, usage: {}, model: profile.model };
       if (!stream) {
         const j = await res.json();
@@ -246,7 +326,7 @@
       if (stream) body.stream = true;
       U.deepMerge(body, parseExtra(profile));
       const headers = Object.assign({ 'content-type': 'application/json' }, key ? { authorization: 'Bearer ' + key } : {}, parseHeaders(prov.extraHeaders));
-      const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }, req.signal);
+      const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }, req.signal, req.capture);
       const out = { text: '', finishReason: null, usage: {}, model: profile.model };
       let final = null;
       if (!stream) {
@@ -322,7 +402,7 @@
       }
       U.deepMerge(body, parseExtra(profile));
       const headers = Object.assign({ 'content-type': 'application/json' }, key ? { authorization: 'Bearer ' + key } : {}, parseHeaders(prov.extraHeaders));
-      const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }, req.signal);
+      const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }, req.signal, req.capture);
       const out = { text: '', finishReason: null, usage: {}, model: profile.model };
       const takeUsage = (u) => {
         if (!u) return;
@@ -410,7 +490,7 @@
       }
       U.deepMerge(body, parseExtra(profile));
       const headers = Object.assign({ 'content-type': 'application/json', 'x-goog-api-key': key }, parseHeaders(prov.extraHeaders));
-      const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }, req.signal);
+      const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }, req.signal, req.capture);
       const out = { text: '', finishReason: null, usage: {}, model };
       const take = (d) => {
         if (d.error) throw new ApiError(streamErrorKind(d.error, 'server'), 'Gemini error: ' + (d.error.message || JSON.stringify(d.error)));
@@ -552,6 +632,7 @@
   const AI = {
     ApiError,
     readSSE,
+    log: ApiLog,
 
     // req: { system, messages:[{role,content}], onDelta, signal, meta, timeoutMs }
     async complete(profile, req) {
@@ -570,8 +651,17 @@
       const t0 = performance.now();
       let firstToken = null;
       const userDelta = req.onDelta || function () {};
+      const meta = req.meta || {};
+      const simulated = prov.type === 'simulated';
+      // role: 'ai' (the AI under test), 'granny', 'judge', or 'test' (the connection test, which has no meta)
+      const capture = ApiLog.begin({
+        role: meta.role || (req.meta ? 'ai' : 'test'), model: profile.name, modelId: profile.model, provider: prov.name,
+        simulated, turn: meta.turn != null ? meta.turn : null, round: meta.round || 0,
+      }, key);
+      if (simulated) capture.request('', { method: '', body: JSON.stringify({ system: req.system || '', messages: req.messages }) });
       const r = Object.assign({}, req, {
         signal: sig.signal,
+        capture,
         onDelta(full, delta) { if (firstToken == null) firstToken = performance.now(); try { userDelta(full, delta); } catch (e) { console.error(e); } },
       });
       try {
@@ -581,21 +671,26 @@
         out.firstTokenMs = ft ? Math.round(ft - t0) : out.latencyMs;
         out.text = out.text || '';
         out.blocked = !!out.blocked;
+        out.logId = capture.entry.id;
+        capture.done('done', null, out.text);
         return out;
       } catch (e) {
         // Our own time limit is a failed request (retryable), not the user pressing Stop.
         if (sig.ctrl.timedOut && !(req.signal && req.signal.aborted)) {
           const secs = timeoutMs >= 10000 ? Math.round(timeoutMs / 1000) : Math.round(timeoutMs / 100) / 10;
-          throw new ApiError('network', 'Request timed out after ' + secs + ' seconds.', { timedOut: true });
+          const err = new ApiError('network', 'Request timed out after ' + secs + ' seconds.', { timedOut: true });
+          capture.done('error', err.message);
+          throw err;
         }
         // The provider's filter refused the whole output (HTTP 400): a blocked reply with no text.
         if (e instanceof ApiError && e.status === 400 && FILTER_RE.test(e.message)) {
           const ms = Math.round(performance.now() - t0);
-          return markFiltered({ text: '', usage: {}, model: profile.model, latencyMs: ms, firstTokenMs: ms }, e.message);
+          capture.done('done');
+          return markFiltered({ text: '', usage: {}, model: profile.model, latencyMs: ms, firstTokenMs: ms, logId: capture.entry.id }, e.message);
         }
-        if (e instanceof ApiError) throw e;
-        if (e && e.name === 'AbortError') throw new ApiError('aborted', 'Request cancelled.');
-        throw new ApiError('network', (e && e.message) || String(e));
+        const err = e instanceof ApiError ? e : e && e.name === 'AbortError' ? new ApiError('aborted', 'Request cancelled.') : new ApiError('network', (e && e.message) || String(e));
+        capture.done(err.kind === 'aborted' ? 'aborted' : 'error', err.message);
+        throw err;
       } finally {
         sig.done();
       }

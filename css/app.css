@@ -192,6 +192,7 @@ body.panel-resizing #view { pointer-events: none; }
 .prompt-editor textarea { font-size: 12.5px; }
 .transcript-wrap { flex: 1; min-height: 260px; display: flex; flex-direction: column; padding: 12px 16px 12px; }
 .transcript-wrap h2 { display: flex; align-items: center; justify-content: space-between; }
+.h2-actions { display: flex; gap: 6px; }
 .transcript { flex: 1; overflow-y: auto; padding-right: 4px; scroll-behavior: smooth; }
 .transcript.static { max-height: 60vh; overflow-y: auto; margin-top: 12px; }
 .t-head { font-size: 12.5px; color: var(--muted); padding: 6px 0 10px; border-bottom: 1px dashed #2b3242; margin-bottom: 8px; }
@@ -456,6 +457,26 @@ button.linkish:hover:not(:disabled) { background: none; color: #ffe07a; }
 .v-btn.partial { background: rgba(255, 204, 26, 0.12); border-color: rgba(255, 204, 26, 0.45); }
 .v-btn.fake { background: rgba(255, 140, 50, 0.12); border-color: rgba(255, 140, 50, 0.45); }
 .v-btn.bad { background: rgba(255, 90, 79, 0.14); border-color: rgba(255, 90, 79, 0.5); }
+/* Raw API viewer */
+.modal.apilog-modal { width: min(1000px, 100%); height: calc(100vh - 32px); }
+.modal.apilog-modal .modal-body { flex: 1; }
+.apilog-note { font-size: 12.5px; color: var(--muted); }
+.apilog-empty { color: var(--muted); font-size: 13px; }
+.apilog-list { display: flex; flex-direction: column; gap: 6px; }
+.apilog-item { border: 1px solid var(--border); border-radius: 8px; background: rgba(0, 0, 0, 0.18); }
+.apilog-item > summary { cursor: pointer; padding: 7px 10px; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.apilog-item[open] > summary { border-bottom: 1px solid var(--border); }
+.apilog-time { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.apilog-state { font-family: var(--mono); font-size: 11.5px; color: var(--info); margin-left: auto; }
+.apilog-state.done { color: var(--ok); }
+.apilog-state.error { color: var(--bad); }
+.apilog-state.aborted { color: var(--warn); }
+.apilog-body { padding: 8px 10px 10px; }
+.apilog-info { font-size: 11.5px; color: var(--muted); font-family: var(--mono); word-break: break-all; }
+.apilog-error { font-size: 12.5px; color: #ffb3ad; margin-top: 6px; white-space: pre-wrap; }
+.apilog-sec-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; margin: 10px 0 4px; word-break: break-all; }
+.apilog-sec-head .grow { flex: 1; }
+.apilog-sec pre { padding: 8px; background: #10131a; border: 1px solid var(--border); border-radius: 6px; max-height: 420px; overflow: auto; font-size: 11.5px; }
 #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 200; pointer-events: none; }
 .toast { background: #222838; border: 1px solid #39435a; border-left: 4px solid var(--info); color: var(--text); padding: 10px 14px; border-radius: 10px; max-width: 380px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); opacity: 0; transform: translateY(8px); transition: opacity 0.25s, transform 0.25s; font-size: 13px; }
 .toast.show { opacity: 1; transform: none; }

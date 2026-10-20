@@ -336,7 +336,7 @@
             if (calls.length) reply.toolCalls = calls.map((c) => ({ name: c.name, args: c.args || '', line: c.line, known: o.replay ? !!c.known : !!c.tool }));
             const typedNow = Tools.typedText(reply.ai, calls);
             typed.push(typedNow);
-            this.events.emit('ai', turn, reply);
+            this.events.emit('ai', turn, reply, resp.logId);   // logId: the exchange in GB.AI.log
 
             const cost = (round === 0 ? step : toolSec * toolUses) + (tax * reply.ai.length) / 100;
             const tLand = replyStart + cost;
