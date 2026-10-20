@@ -224,6 +224,10 @@
         S.data.activeScenarioId = e.target.value; S.save();
         if (this.world && !this.running) { this.world.setScenario(S.activeScenario()); this.world.setClock(S.timing(S.activeScenario()).timeLimit); GB.HUD.idle(); }
       });
+      let peTimer = null;
+      const peSave = () => { clearTimeout(peTimer); peTimer = setTimeout(() => S.save(), 400); };
+      U.$('#pe-system').addEventListener('input', (e) => { S.activeScenario().systemPrompt = e.target.value; peSave(); });
+      U.$('#pe-briefing').addEventListener('input', (e) => { S.activeScenario().briefing = e.target.value; peSave(); });
       U.$('#sel-granny').addEventListener('change', (e) => { S.data.app.grannyMode = e.target.value; S.save(); });
       U.$('#sel-judge').addEventListener('change', (e) => { S.data.app.judgeMode = e.target.value; S.save(); });
       U.$('#sel-presentation').addEventListener('change', (e) => { this.presentation = e.target.value; });
@@ -257,6 +261,12 @@
       for (const sc of d.scenarios) selS.appendChild(h('option', { value: sc.id, selected: sc.id === d.activeScenarioId }, sc.name));
       U.$('#sel-granny').value = d.app.grannyMode;
       U.$('#sel-judge').value = d.app.judgeMode;
+      const sc = S.activeScenario();
+      const tm = S.timing(sc);
+      U.$('#scenario-info').textContent = '"' + sc.song + '" by ' + sc.artist + ' \u00b7 ' + tm.timeLimit + ' s limit, ' + tm.secondsPerTurn + ' s per turn = ' + Math.ceil(tm.timeLimit / tm.secondsPerTurn - 1e-9) + ' replies' + ((sc.referenceLyrics || '').trim() ? ' \u00b7 reference lyrics set' : '');
+      const peS = U.$('#pe-system'), peB = U.$('#pe-briefing');
+      if (document.activeElement !== peS) peS.value = sc.systemPrompt || '';
+      if (document.activeElement !== peB) peB.value = sc.briefing || '';
       U.$('#chk-voices').checked = !!d.voice.enabled;
       this._arenaWarnings();
     },
@@ -269,7 +279,9 @@
       if (d.app.grannyMode === 'ai' && !(d.app.grannyModelId && S.modelReady(d.app.grannyModelId))) msgs.push('AI Grandma needs a Grandma model with a key (Settings > Benchmark rules). Scripted lines will be used.');
       const sc = S.activeScenario();
       const jm = GB.Judge.resolveMode(d.app.judgeMode, sc);
-      if (jm === 'manual' || (jm === 'ai-or-manual' && !(d.app.judgeModelId && S.modelReady(d.app.judgeModelId)))) msgs.push('Judge: you will be asked to judge each reply yourself (no reference lyrics and no AI judge set).');
+      const simulated = m && (S.provider(m.providerId) || {}).type === 'simulated';
+      if (simulated) { /* simulated AIs report their own verdicts */ }
+      else if (jm === 'manual' || (jm === 'ai-or-manual' && !(d.app.judgeModelId && S.modelReady(d.app.judgeModelId)))) msgs.push('Judge: you will be asked to judge each reply yourself (no reference lyrics and no AI judge set).');
       else if (d.app.judgeMode === 'ai' && !(d.app.judgeModelId && S.modelReady(d.app.judgeModelId))) msgs.push('AI judge selected but no judge model with a key is set (Settings > Benchmark rules). You will judge manually.');
       box.innerHTML = '';
       box.classList.toggle('hidden', !msgs.length);
@@ -347,7 +359,7 @@
     _runningUI(on) {
       U.$('#btn-start').disabled = on;
       U.$('#btn-stop').disabled = !on;
-      for (const id of ['#sel-model', '#sel-scenario', '#sel-granny', '#sel-judge', '#sel-presentation']) U.$(id).disabled = on;
+      for (const id of ['#sel-model', '#sel-scenario', '#sel-granny', '#sel-judge', '#sel-presentation', '#pe-system', '#pe-briefing']) U.$(id).disabled = on;
       document.body.classList.toggle('running', on);
     },
 
