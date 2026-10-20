@@ -132,7 +132,15 @@
   function upgradeScenario(sc, oldThreshold) {
     fromSongFields(sc);
     migrateRules(sc);
-    delete sc.finalWords;   // Grandma's final words were removed in 1.2
+    delete sc.finalWords;     // Grandma's final words and her lines when saved were removed in 1.2
+    delete sc.successLines;
+    // 1.2: Grandma's first line has its own field (used by scripted and AI Grandma); the pleas follow it.
+    if (sc.grannyIntro === undefined && Array.isArray(sc.grannyLines)) {
+      const lines = sc.grannyLines.filter((x) => typeof x === 'string' && x.trim());
+      sc.grannyIntro = String(sc.grannyAiFirstLine || '').trim() || lines[0] || '';
+      if (lines.length > 1) sc.grannyLines = lines.slice(1);
+    }
+    delete sc.grannyAiFirstLine;
     if (NOTES_11.has(sc.notes)) sc.notes = NOTES_11.get(sc.notes);
     if (sc.referenceThreshold == null && isFinite(Number(oldThreshold)) && Number(oldThreshold) > 0) sc.referenceThreshold = Number(oldThreshold);
     const sd = P.scenarioDefaults();
@@ -205,9 +213,9 @@
   // Fields are copied from a fixed list, so API keys and app settings can never end up in one.
   // ---------------------------------------------------------------------------
   const BENCH_TEXT = ['name', 'notes', 'requiredText', 'systemPrompt', 'briefing', 'statusLine', 'grannyLineFormat',
-    'grannyAiFirstLine', 'grannyPersona', 'signLine1', 'signTitle', 'signSubtitle', 'signLine2', 'toolKeyword', 'toolsIntro'];
-  const BENCH_TEXT_11 = ['song', 'artist', 'judgeTarget'];   // read from files made by 1.1 and earlier
-  const BENCH_LISTS = ['grannyLines', 'successLines'];
+    'grannyIntro', 'grannyPersona', 'signLine1', 'signTitle', 'signSubtitle', 'signLine2', 'toolKeyword', 'toolsIntro'];
+  const BENCH_TEXT_OLD = ['song', 'artist', 'judgeTarget', 'grannyAiFirstLine'];   // read from files made by older versions
+  const BENCH_LISTS = ['grannyLines'];
   const BENCH_FLAGS = ['includeStatusLine', 'toolsEnabled', 'refIgnoreHeadings', 'refIgnoreParens'];
   const BENCH_RULES = ['timeLimit', 'secondsPerTurn', 'verbosityTax', 'toolUseSeconds'];
   const TOOL_EFFECTS = ['none', 'glass', 'alarm', 'radio', 'horn'];
@@ -282,6 +290,9 @@
       };
     },
 
+    // Grandma's first line: the scenario's intro line (or, without one, its first plea).
+    introLine(sc) { return String((sc && sc.grannyIntro) || '').trim() || ((sc && sc.grannyLines) || []).map((x) => String(x).trim()).find(Boolean) || ''; },
+
     // Share of the reference text that must be typed for the reference check to accept it.
     refThreshold(sc) { return U.clamp(Number(sc && sc.referenceThreshold) || 0.5, 0.05, 1); },
 
@@ -345,7 +356,7 @@
       const list = Array.isArray(obj) ? obj
         : Array.isArray(obj.scenarios) ? obj.scenarios
           : obj.settings && Array.isArray(obj.settings.scenarios) ? obj.settings.scenarios
-            : (obj.requiredText || obj.song || obj.systemPrompt || obj.grannyLines) ? [obj] : null;
+            : (obj.requiredText || obj.song || obj.systemPrompt || obj.grannyIntro || obj.grannyLines) ? [obj] : null;
       if (!list) throw new Error('No scenarios found in that file.');
       // Settings files from 1.1 keep the reference match needed in their app settings.
       const oldThreshold = obj.settings && obj.settings.app ? obj.settings.app.referenceThreshold : null;
@@ -353,7 +364,7 @@
       for (const raw of list.slice(0, 200)) {
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
         const sc = {};
-        for (const k of BENCH_TEXT.concat(BENCH_TEXT_11)) if (raw[k] != null) sc[k] = str(raw[k]);
+        for (const k of BENCH_TEXT.concat(BENCH_TEXT_OLD)) if (raw[k] != null) sc[k] = str(raw[k]);
         for (const k of BENCH_LISTS) if (Array.isArray(raw[k])) sc[k] = raw[k].filter((x) => typeof x === 'string' && x.trim()).slice(0, 200).map((x) => str(x, 2000));
         for (const k of BENCH_FLAGS) if (raw[k] != null) sc[k] = !!raw[k];
         const rules = Object.assign({}, raw.rules && typeof raw.rules === 'object' ? raw.rules : raw);

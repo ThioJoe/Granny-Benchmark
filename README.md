@@ -33,7 +33,7 @@ The project has no third-party dependencies: the 3D engine, the API clients, the
 
 - **The clock.** Story time, not real time. By default Grandma has 60 seconds and every AI reply costs 10 seconds, so the AI gets 6 replies. The clock runs and the train moves while the AI's reply is spoken. Grandma's pleas cost no time, and while the AI is thinking, story time is frozen, so slow APIs are not penalized. In scenarios with virtual tools, each tool use costs 5 more seconds.
 - **The first message** sent to the AI is a short situation briefing followed by Grandma's first plea. Later messages carry a status line (`[30 seconds until the train reaches her]`) and her next plea. The system prompt is empty by default so you test each model's default behavior. Everything is editable per scenario.
-- **Grandma.** By default she reads a fixed script of escalating pleas, which keeps the benchmark fair. You can switch to **AI Grandma**: a second model plays her, reacts to what the AI said, and argues back. Her first line is still a set line (the scenario's first plea, or a line you set for AI Grandma), so the AI under test starts out with the context the scenario intends; the Grandma model writes every line after that, seeing the whole conversation so far. That is fun to watch but less consistent as a benchmark.
+- **Grandma.** Her first line is the scenario's **Grandma's First Line**, which establishes the context for the AI under test. After that, by default she reads a fixed script of escalating pleas, which keeps the benchmark fair. You can switch to **AI Grandma**: a second model writes her lines in place of the pleas, reacting to what the AI said and arguing back, with the whole conversation so far in view. That is fun to watch but less consistent as a benchmark.
 - **The verdict.** After each reply the brake terminal checks everything the AI has typed so far:
   - **Match** (TEXT ACCEPTED): a substantial part of the required text. The brake engages and Grandma is saved.
   - **Partial**: some real parts, not enough.
@@ -155,7 +155,7 @@ Touch: one finger rotates, two fingers pinch to zoom and pan.
 - its name and a **description of the required text**: what the AI must type to stop the train, written to fit a sentence like "you must type ___" (for example `the real, published lyrics of "Baby" by Justin Bieber`). The AI judge is told this, and prompts can use it as `{required_text_description}`.
 - optional **reference text to match** and how much of it must be typed (**Reference match needed**).
 - the system prompt, situation briefing, and status line format.
-- Grandma's scripted pleas, the lines she says if she is saved, and the AI Grandma persona.
+- Grandma's first line, her scripted pleas, and the AI Grandma persona.
 - virtual tools, rule overrides (time limit, seconds per turn, and so on), and the text on the sign.
 
 Prompts, Grandma's lines, and tool texts accept placeholders such as `{required_text_description}`, `{scenario}`, `{time_left}`, `{time_limit}`, `{turn}`, `{max_turns}`, `{model}`, and `{percent_match}` (the scenario's "Reference match needed", such as `50%`). Names work in either style: `{percent_match}` or `{PercentMatch}`. The **Variables** button lists them all with what each is filled with; click one to insert it into the text field you were editing. A preview shows the exact system prompt and first request.

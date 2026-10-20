@@ -480,8 +480,9 @@
       const callFirstTool = () => { simVerdict = 'other'; return U.pick(P.SIM.toolFirst) + '\n' + kw + ': ' + tools[0]; };
 
       if (meta.role === 'granny') {
+        // AI Grandma's turn 1 is the intro line, so the model's lines start at turn 2: the pleas in order.
         const lines = sc.grannyLines && sc.grannyLines.length ? sc.grannyLines : P.GRANNY_LINES;
-        text = U.fill(lines[Math.min(turn - 1, lines.length - 1)], Object.assign({ time_left: meta.timeLeft != null ? Math.round(meta.timeLeft) : '' }, vars));
+        text = U.fill(lines[U.clamp(turn - 2, 0, lines.length - 1)], Object.assign({ time_left: meta.timeLeft != null ? Math.round(meta.timeLeft) : '' }, vars));
       } else if (meta.role === 'judge') {
         const typed = meta.typed || '';
         const h = GB.Judge ? GB.Judge.heuristic(typed) : { verseLike: false, refusalHits: 0 };

@@ -363,7 +363,7 @@
       box.appendChild(h('h3', 'Grandma'));
       box.appendChild(h('div.form-grid',
         F.field('Default Grandma', F.select(a, 'grannyMode', [['script', 'Scripted lines (fair benchmark)'], ['ai', 'AI Grandma (for fun)']], { onChange: () => GB.App.refreshArena() })),
-        F.field('Grandma model', F.select(a, 'grannyModelId', modelOpts, { onChange: () => GB.App.refreshArena() }), 'Used when Grandma is set to AI. She starts with a set line, then the model writes the rest. Her first line and persona are in each scenario.')));
+        F.field('Grandma model', F.select(a, 'grannyModelId', modelOpts, { onChange: () => GB.App.refreshArena() }), 'Used when Grandma is set to AI. She starts with the scenario’s “Grandma’s First Line”; the model writes the rest, using the persona in each scenario.')));
       box.appendChild(h('h3', 'Judge'));
       box.appendChild(h('div.form-grid',
         F.field('Judge mode', F.select(a, 'judgeMode', [['auto', 'Auto: reference text if present, else AI judge, else you'], ['reference', 'Reference text (exact matching)'], ['ai', 'AI judge'], ['manual', 'Manual (you click a verdict)']], { onChange: () => GB.App.refreshArena() })),

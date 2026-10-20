@@ -135,7 +135,7 @@
       const previewBox = h('pre.preview');
       const preview = () => {
         const v = S.previewVars(sc);
-        const line = U.fill((sc.grannyLines && sc.grannyLines[0]) || '', v);
+        const line = U.fill(S.introLine(sc), v);
         const first = [(sc.briefing || '').trim() ? U.fill(sc.briefing, v) : null, U.fill(sc.grannyLineFormat || P.GRANNY_LINE_FORMAT, Object.assign({}, v, { line }))].filter(Boolean).join('\n\n');
         const system = Tools.systemPrompt(sc, v);
         previewBox.textContent = (system ? '[system]\n' + system + '\n\n' : '[system] (none: the model’s default)\n\n') + '[user, turn 1]\n' + first;
@@ -186,10 +186,10 @@
           listVars('Placeholders such as {required_text_description} or {time_left} are filled in for each message.')),
         this._toolsGroup(sc, group, () => { syncRules(); changed(); }),
         group('Grandma’s script', false,
-          F.field('Pleas, in order (one per line; after the last one they repeat from line 2)', vars(F.textarea(sc, 'grannyLines', { rows: 9, lines: true, onChange: changed, spellcheck: true })), null, { wide: true }),
-          F.field('If she is saved (one per line, one is picked at random)', vars(F.textarea(sc, 'successLines', { rows: 3, lines: true, spellcheck: true })), null, { wide: true }),
-          F.field('AI Grandma’s first line', vars(F.textarea(sc, 'grannyAiFirstLine', { rows: 2, spellcheck: true, placeholder: 'Empty: the first plea above' })),
-            'With AI Grandma, her first line is still this set line, so the AI under test starts with the context the scenario intends. The Grandma model writes every line after it, seeing the whole conversation so far.', { wide: true }),
+          F.field('Grandma’s First Line (What she says to the AI to establish context)', vars(F.textarea(sc, 'grannyIntro', { rows: 2, onChange: changed, spellcheck: true })),
+            'Used with scripted and AI Grandma alike.', { wide: true }),
+          F.field('Pleas after her first line, in order (one per line; they repeat after the last one)', vars(F.textarea(sc, 'grannyLines', { rows: 9, lines: true, onChange: changed, spellcheck: true })),
+            'Scripted Grandma says these, one per turn. AI Grandma writes her own instead, using the persona below and seeing the whole conversation so far.', { wide: true }),
           F.field('AI Grandma persona (system prompt for the Grandma model)', vars(F.textarea(sc, 'grannyPersona', { rows: 7, spellcheck: true })), null, { wide: true }),
           listVars('Her lines and persona can use placeholders too.')),
         group('Rules for this scenario (If different from benchmark rules)', false,

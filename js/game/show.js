@@ -35,7 +35,7 @@
 
     danger() { return U.clamp(this.vt / this.T, 0, 1); }
 
-    // Placeholders for the narrator's intro and Grandma's line when she is saved.
+    // Placeholders for the narrator's intro.
     _vars(rec) {
       return {
         required_text_description: String(rec.scenario.requiredText || '').trim(), scenario: rec.scenario.name, model: rec.model.name,
@@ -374,17 +374,7 @@
       await this._wait(this.fast ? 0.5 : 1.6);
       if (this.aborted) return;
       GB.SFX.fanfare();
-      const lines = (rec.scenario.successLines || P.SUCCESS_LINES).filter(Boolean);
-      const line = U.fill(U.pick(lines.length ? lines : P.SUCCESS_LINES), this._vars(rec));
       w.setRobotLook('camera');
-      if (!GB.TTS.skips('granny')) {
-        GB.Bubbles.show('granny', line);
-        this._talk('granny', true);
-        const h = this._speak('granny', line);
-        await this._race(h.promise);
-        w.setTalking('granny', false);
-        GB.Bubbles.fade('granny');
-      }
       await this._race(tower);
     }
 

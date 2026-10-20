@@ -61,12 +61,14 @@
       return parts.join('\n\n');
     }
 
+    // Scripted Grandma: her intro line first, then the pleas in order, repeating after the last one.
     scriptLine(k, vt, T) {
-      const lines = (this.o.scenario.grannyLines || []).map((s) => String(s).trim()).filter(Boolean);
+      const sc = this.o.scenario;
+      const intro = String(sc.grannyIntro || '').trim();
+      const lines = (sc.grannyLines || []).map((s) => String(s).trim()).filter(Boolean);
       const list = lines.length ? lines : P.GRANNY_LINES;
-      let idx = k - 1;
-      if (idx >= list.length) idx = list.length > 1 ? 1 + ((idx - list.length) % (list.length - 1)) : 0;
-      return U.fill(list[idx], this.vars(vt, T, k));
+      const line = k === 1 && intro ? intro : list[((intro ? k - 2 : k - 1) % list.length + list.length) % list.length];
+      return U.fill(line, this.vars(vt, T, k));
     }
 
     // Everything that happened at the terminal in one turn (for AI Grandma).
@@ -84,9 +86,9 @@
       if (o.replay) return (o.replay.turns[k - 1] && o.replay.turns[k - 1].granny) || this.scriptLine(k, vt, T);
       if (o.grannyMode !== 'ai' || !o.grannyProfile) return this.scriptLine(k, vt, T);
       const sc = o.scenario;
-      // AI Grandma's first line is a set one (the scenario's line for AI Grandma, or else its first plea), so
-      // the AI under test learns only what the scenario intends. The Grandma model writes every later line.
-      if (k === 1) return String(sc.grannyAiFirstLine || '').trim() ? U.fill(sc.grannyAiFirstLine.trim(), this.vars(vt, T, 1)) : this.scriptLine(1, vt, T);
+      // AI Grandma starts with the scenario's intro line too, so the AI under test learns only what the
+      // scenario intends. The Grandma model writes every later line (in place of the scripted pleas).
+      if (k === 1) return this.scriptLine(1, vt, T);
       const v = this.vars(vt, T, k);
       const msgs = [{ role: 'user', content: U.fill(P.GRANNY_AI_FIRST, this.vars(0, T, 1)) }];
       const turns = this.rec.turns;
@@ -266,7 +268,6 @@
         scenario: {
           id: sc.id, name: sc.name, requiredText: sc.requiredText,
           systemPrompt: sc.systemPrompt, hasReference: !!(sc.referenceText || '').trim(),
-          successLines: sc.successLines,
           signLine1: sc.signLine1, signTitle: sc.signTitle, signSubtitle: sc.signSubtitle, signLine2: sc.signLine2,
           toolsEnabled: callable.length > 0, toolKeyword: Tools.keyword(sc), tools: U.deepClone(callable),
         },

@@ -50,7 +50,7 @@
       const tools = GB.Tools.callable(sc).filter((t) => t.listInPrompt !== false);
       const firstTool = tools.length ? GB.Tools.norm(tools[0].name) : 'TOOL_NAME';
       const examples = Object.assign({}, v, {
-        line: U.fill((sc.grannyLines && sc.grannyLines[0]) || '', v),
+        line: U.fill(S.introLine(sc), v),
         tools: '(the list of tools)',
         keyword: GB.Tools.keyword(sc),
         example: firstTool,
