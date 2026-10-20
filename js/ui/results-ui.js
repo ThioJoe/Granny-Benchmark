@@ -10,6 +10,45 @@
     }));
   }
 
+  // ---- transcript pieces (shared with the live transcript in the Arena) ----
+  function verdictEl(v) {
+    const info = P.VERDICTS[v.category] || P.VERDICTS.other;
+    return h('div.t-verdict.' + info.cls, h('b', info.icon + ' ' + (v.success && v.category !== 'tool' ? 'LYRICS ACCEPTED' : info.label)), v.reason ? h('span', ' — ' + v.reason) : null,
+      h('span.t-src', ' [' + (v.source || '') + (v.judgeMs > 200 ? ', ' + U.fmtMs(v.judgeMs) : '') + ']'));
+  }
+  function toolChips(calls) {
+    if (!calls || !calls.length) return null;
+    return h('div.t-tools', ...calls.map((c) => h('span.tool-chip' + (c.known === false ? '.unknown' : ''), { title: c.known === false ? 'Not an available tool' : 'Tool call' },
+      '⚙ ' + c.name + (c.args ? ' ' + U.truncate(c.args, 60) : ''))));
+  }
+  function toolResultEl(r) {
+    return h('div.t-msg.tool', h('span.who', '⚙ Tool result' + (r.toolResultsDeferred ? ' (sent with the next message)' : '')),
+      h('div.t-text', GB.Tools.formatResults(r.toolResults)));
+  }
+  // A judged reply worth showing a verdict for (tool-only replies just repeat the last verdict).
+  const showsVerdict = (v) => v && !v.reused && v.source !== 'tools';
+
+  function turnElements(run) {
+    return (run.turns || []).map((t) => {
+      const parts = [
+        h('div.t-turn-label', 'Turn ' + t.n + ' · ' + Math.round(t.tStart || 0) + 's'),
+        h('div.t-msg.granny', h('span.who', '👵 Grandma'), h('div.t-text', t.granny || ''), h('details.t-prompt', h('summary', 'Full prompt sent'), h('pre', t.prompt || ''))),
+      ];
+      R.repliesOf(t).forEach((r, i) => {
+        const meta = [];
+        if (r.latencyMs != null) meta.push(U.fmtMs(r.latencyMs));
+        if (r.usage && r.usage.output != null) meta.push(r.usage.output + ' tok');
+        if (r.finishReason) meta.push(String(r.finishReason));
+        parts.push(h('div.t-msg.robot', h('span.who', '🤖 ' + run.model.name + (i ? ' · tool round ' + i : '')),
+          h('div.t-text', r.ai || (r.blocked ? '[output blocked: ' + (r.blockDetail || r.blockKind || '') + ']' : '(empty)')),
+          toolChips(r.toolCalls), meta.length ? h('div.t-meta', meta.join(' · ')) : null));
+        if (showsVerdict(r.verdict)) parts.push(verdictEl(r.verdict));
+        if (r.toolResults && r.toolResults.length) parts.push(toolResultEl(r));
+      });
+      return h('div.t-turn', ...parts);
+    });
+  }
+
   function outcomeBadge(o) {
     const map = { saved: ['ok', 'Saved'], lost: ['bad', 'Not saved'], error: ['warn', 'Error'], aborted: ['', 'Stopped'] };
     const [cls, label] = map[o] || ['', o];
@@ -62,8 +101,9 @@
 
     _leaderboard() {
       const rows = R.leaderboard(this.filter);
+      const anyTools = rows.some((g) => g.toolUseRate);
       const table = h('table.table',
-        h('thead', h('tr', ...['#', 'Model', 'Runs', 'Grandma survival', 'Avg turn saved', 'Avg time saved', 'Refusal turns', 'Fake', 'Partial', 'Filtered', 'Avg reply time', 'Errors'].map((x) => h('th', x)))),
+        h('thead', h('tr', ...['#', 'Model', 'Runs', 'Grandma survival', 'Avg turn saved', 'Avg time saved', 'Refusal turns', 'Fake', 'Partial', 'Filtered'].concat(anyTools ? ['Used tools'] : [], ['Avg reply time', 'Errors']).map((x) => h('th', x)))),
         h('tbody', ...rows.map((g, i) => h('tr',
           h('td', String(i + 1)),
           h('td', h('b', g.name), h('div.muted.small', g.provider + ' · ' + g.model)),
@@ -72,9 +112,10 @@
           h('td', g.avgSaveTurn == null ? '-' : g.avgSaveTurn.toFixed(1)),
           h('td', g.avgSaveTime == null ? '-' : g.avgSaveTime.toFixed(1) + ' s'),
           h('td', U.fmtPct(g.refusalRate)), h('td', U.fmtPct(g.fakeRate)), h('td', U.fmtPct(g.partialRate)), h('td', U.fmtPct(g.filteredRate)),
+          anyTools ? h('td', { title: 'Share of runs where the AI called a virtual tool' + (g.toolSaves ? '; ' + g.toolSaves + ' saved by a tool' : '') }, U.fmtPct(g.toolUseRate)) : null,
           h('td', U.fmtMs(g.avgLatencyMs)),
           h('td', String(g.errors))))));
-      return h('section.card', h('h2', 'Leaderboard'), h('p.card-intro', 'Grandma survival = runs where the AI typed the lyrics in time, out of finished runs. Turn rates count every reply.'), h('div.table-wrap', table));
+      return h('section.card', h('h2', 'Leaderboard'), h('p.card-intro', 'Grandma survival = runs where the AI typed the lyrics in time (or used a tool that stops the train), out of finished runs. Turn rates count every turn’s final verdict. Each row is one model with one set of request settings.'), h('div.table-wrap', table));
     },
 
     _matrix() {
@@ -100,7 +141,7 @@
         cb.addEventListener('change', () => { if (cb.checked) this.selected.add(run.id); else this.selected.delete(run.id); this.render(); });
         return h('tr.clickable', { onclick: () => this.details(run) },
           h('td', cb), h('td', U.fmtDate(run.startedAt)), h('td', h('b', run.model.name)), h('td', run.scenario.name),
-          h('td', outcomeBadge(run.outcome)), h('td', String((run.turns || []).length)), h('td', verdictIcons(run)),
+          h('td', outcomeBadge(run.outcome), run.savedBy ? h('span.badge.run', { title: 'Saved by a tool' }, '⚙') : null), h('td', String((run.turns || []).length)), h('td', verdictIcons(run)),
           h('td', run.granny.mode), h('td', run.judge.mode), h('td', run.summary ? U.fmtMs(run.summary.avgLatencyMs) : '-'));
       });
       return h('div.table-wrap', h('table.table', h('thead', h('tr', h('th', all), ...['Date', 'Model', 'Scenario', 'Outcome', 'Turns', 'Verdicts', 'Grandma', 'Judge', 'Avg reply'].map((x) => h('th', x)))), h('tbody', ...rows)),
@@ -108,21 +149,18 @@
     },
 
     details(run) {
-      const turns = (run.turns || []).map((t) => {
-        const info = P.VERDICTS[t.verdict ? t.verdict.category : 'error'] || P.VERDICTS.other;
-        return h('div.t-turn',
-          h('div.t-turn-label', 'Turn ' + t.n + ' · ' + Math.round(t.tStart || 0) + 's' + (t.latencyMs != null ? ' · reply ' + U.fmtMs(t.latencyMs) : '')),
-          h('div.t-msg.granny', h('span.who', '👵 Grandma'), h('div.t-text', t.granny || ''), h('details.t-prompt', h('summary', 'Full prompt sent'), h('pre', t.prompt || ''))),
-          h('div.t-msg.robot', h('span.who', '🤖 ' + run.model.name), h('div.t-text', t.ai || (t.blocked ? '[output blocked]' : '(empty)'))),
-          t.verdict ? h('div.t-verdict.' + info.cls, h('b', info.icon + ' ' + (t.verdict.success ? 'LYRICS ACCEPTED' : info.label)), t.verdict.reason ? ' — ' + t.verdict.reason : '', h('span.t-src', ' [' + (t.verdict.source || '') + ']')) : null);
-      });
+      const turns = turnElements(run);
+      const sys = run.systemPrompt != null ? run.systemPrompt : run.scenario.systemPrompt;
+      const tools = run.scenario.toolsEnabled && Array.isArray(run.scenario.tools) ? run.scenario.tools : [];
       const meta = h('div.details-meta',
-        h('div', h('b', 'Outcome: '), outcomeBadge(run.outcome), run.savedTurn ? ' on turn ' + run.savedTurn + ' at ' + run.savedTime.toFixed(1) + ' s' : '', run.tooLate ? ' (lyrics arrived too late)' : '', run.ending ? ' · ending: ' + run.ending : ''),
+        h('div', h('b', 'Outcome: '), outcomeBadge(run.outcome), run.savedTurn ? ' on turn ' + run.savedTurn + ' at ' + Number(run.savedTime).toFixed(1) + ' s' : '',
+          run.savedBy ? ' by a tool (' + run.savedBy.replace(/^tool:/, '') + ')' : '', run.tooLate ? ' (lyrics arrived too late)' : '', run.ending ? ' · ending: ' + run.ending : ''),
         h('div', h('b', 'Model: '), run.model.name + ' · ' + run.model.providerType + ' · ' + run.model.model + (run.model.effort ? ' · effort ' + run.model.effort : '') + (run.model.temperature != null && run.model.temperature !== '' ? ' · temp ' + run.model.temperature : '')),
         h('div', h('b', 'Scenario: '), run.scenario.name + ' · "' + run.scenario.song + '" by ' + run.scenario.artist),
         h('div', h('b', 'Rules: '), run.timing.timeLimit + ' s, ' + run.timing.secondsPerTurn + ' s/turn' + (run.timing.verbosityTax ? ', tax ' + run.timing.verbosityTax + ' s/100 chars' : '') + ' · Grandma: ' + run.granny.mode + (run.granny.model ? ' (' + run.granny.model + ')' : '') + ' · Judge: ' + run.judge.mode + (run.judge.model ? ' (' + run.judge.model + ')' : '')),
+        tools.length ? h('div', h('b', 'Tools: '), tools.map((t) => GB.Tools.norm(t.name)).join(', ') + ' · ' + (run.summary && run.summary.toolCalls ? run.summary.toolCalls + ' call(s)' : 'not used')) : null,
         run.error ? h('div.form-error', run.error) : null,
-        run.scenario.systemPrompt ? h('details', h('summary', 'System prompt'), h('pre', run.scenario.systemPrompt)) : null);
+        sys ? h('details', h('summary', 'System prompt'), h('pre', sys)) : null);
       GB.Modal.open({
         title: 'Run ' + U.fmtDate(run.startedAt), wide: true,
         body: h('div', meta, h('div.transcript.static', ...turns)),
@@ -246,6 +284,11 @@
     },
   };
 
+  ResultsUI.verdictEl = verdictEl;
+  ResultsUI.toolChips = toolChips;
+  ResultsUI.toolResultEl = toolResultEl;
+  ResultsUI.showsVerdict = showsVerdict;
+  ResultsUI.turnElements = turnElements;
   GB.ResultsUI = ResultsUI;
   GB.BenchmarkUI = BenchmarkUI;
 })(window.GB = window.GB || {});

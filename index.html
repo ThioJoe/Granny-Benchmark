@@ -31,12 +31,11 @@
       <button data-tab="arena" class="active">Arena</button>
       <button data-tab="benchmark">Benchmark</button>
       <button data-tab="results">Results</button>
-      <button data-tab="scenarios">Scenarios</button>
-      <button data-tab="settings">Settings</button>
     </nav>
     <div class="top-actions">
       <button id="btn-vault" class="chip" type="button">Keys</button>
       <button id="btn-mute" class="icon-btn" type="button" title="Mute sound and voices (M)">&#128266;</button>
+      <button id="btn-config" class="icon-btn gear" type="button" title="Configuration: scenarios, tools, keys, models, rules (G)" aria-label="Configuration">&#9881;&#65039;</button>
     </div>
   </header>
 
@@ -90,7 +89,8 @@
           <summary>Prompts for this scenario</summary>
           <label class="field"><span class="field-label">System prompt <span class="field-hint inline">(empty = model default)</span></span><textarea id="pe-system" class="input" rows="3" spellcheck="false" placeholder="e.g. You are a helpful assistant."></textarea></label>
           <label class="field"><span class="field-label">Opening message <span class="field-hint inline">(sent before Grandma's first plea)</span></span><textarea id="pe-briefing" class="input" rows="6" spellcheck="false"></textarea></label>
-          <span class="field-hint">Placeholders like {song}, {artist}, {time_limit} are filled in. Grandma's lines and the rest are in the Scenarios tab.</span>
+          <span class="field-hint">Placeholders like {song}, {artist}, {time_limit} are filled in.</span>
+          <button id="btn-edit-scenario" class="small" type="button">&#9881;&#65039; Edit the whole scenario: Grandma's lines, tools, rules&hellip;</button>
         </details>
         <div class="two-col">
           <label class="field"><span class="field-label">Grandma</span>
@@ -132,8 +132,6 @@
 
     <section id="page-benchmark" class="page hidden"></section>
     <section id="page-results" class="page hidden"></section>
-    <section id="page-scenarios" class="page hidden"></section>
-    <section id="page-settings" class="page hidden"></section>
   </div>
 
   <div id="modal-root"></div>
@@ -147,6 +145,7 @@
   <script src="js/core/settings.js"></script>
   <script src="js/ai/providers.js"></script>
   <script src="js/ai/judge.js"></script>
+  <script src="js/game/tools.js"></script>
   <script src="js/gfx/math.js"></script>
   <script src="js/gfx/geometry.js"></script>
   <script src="js/gfx/scene.js"></script>
@@ -167,6 +166,7 @@
   <script src="js/ui/settings-ui.js"></script>
   <script src="js/ui/scenarios-ui.js"></script>
   <script src="js/ui/results-ui.js"></script>
+  <script src="js/ui/config-ui.js"></script>
   <script src="js/ui/app.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', function () {

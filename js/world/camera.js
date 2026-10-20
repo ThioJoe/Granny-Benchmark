@@ -13,6 +13,8 @@
     robot: () => ({ pos: [5.85, 2.1, -0.3], target: [7.5, 1.05, 1.2] }),
     terminal: () => ({ pos: [6.84, 1.32, 1.18], target: [7.28, 1.06, 1.2], fov: 1.05 }),
     robotFront: () => ({ pos: [4.25, 1.75, 2.75], target: [6.6, 1.45, 1.2] }),
+    panel: () => ({ pos: [5.72, 1.42, 3.42], target: [7.3, 1.15, 2.45], fov: 0.9 }),
+    panelWide: () => ({ pos: [4.3, 2.3, 4.9], target: [6.9, 1.0, 1.9] }),
     side: () => ({ pos: [-16, 3.2, 9], target: [0, 1.3, 7] }),
     aerial: () => ({ pos: [34, 48, -42], target: [2, 0, 12] }),
     tower: () => ({ pos: [-15, 7, -13], target: [0, 7.5, 9] }),
@@ -63,6 +65,7 @@
     setAuto(on) {
       if (this.auto === on) return;
       this.auto = on;
+      if (on) this._manualShot = false;
       if (!on) this._syncManualFromBase();
       this.events.emit('auto', on);
     }
@@ -104,6 +107,10 @@
         case 'impact-bowling': this.goTo('bowlingLane', 0.25); break;
         case 'landing': this.goTo('bowlingLanding', 0.8); break;
         case 'aftermath': this.goTo('robotFront', 1.4); break;
+        case 'tool':
+          if (ctx.effect === 'glass') this.goTo('panel', 0.7);
+          else this.goTo(this.world.panel && this.world.panel.rig.visible ? 'panelWide' : 'robotFront', 0.9);
+          break;
         default: if (SHOTS[beat]) this.goTo(beat, 1.2);
       }
     }
@@ -133,6 +140,7 @@
 
     _manual() {
       if (this.auto) this.setAuto(false);
+      this._manualShot = false;
       if (this.shot) this._syncManualFromBase();
     }
 
@@ -185,7 +193,10 @@
 
       window.addEventListener('keydown', (e) => {
         if (this._typing(e)) return;
+        // Not while a dialog is open or another page covers the 3D view.
+        if ((GB.Modal && GB.Modal.stack.length) || (GB.App && GB.App.tab && GB.App.tab !== 'arena')) return;
         const k = e.key.toLowerCase();
+        if ((k === ' ' || k === 'enter') && e.target && /^(button|a|summary)$/i.test(e.target.tagName || '')) return;
         if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'c'].includes(k)) {
           if (k === ' ' && this.mode !== 'fly') return;
           this.keys[k] = true;

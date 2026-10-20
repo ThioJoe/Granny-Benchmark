@@ -11,24 +11,20 @@
     const out = [];
     for (const para of String(text).split('\n')) {
       if (!para) { out.push(''); continue; }
+      const fits = (s) => ctx.measureText(s).width <= maxWidth;
       let line = '';
       for (const word of para.split(/(\s+)/)) {
         if (!word) continue;
-        const test = line + word;
-        if (ctx.measureText(test).width <= maxWidth || !line) {
-          if (ctx.measureText(test).width > maxWidth && !line) {
-            // very long token: hard break
-            let chunk = '';
-            for (const ch of word) {
-              if (ctx.measureText(chunk + ch).width > maxWidth) { out.push(chunk); chunk = ''; }
-              chunk += ch;
-            }
-            line = chunk;
-          } else line = test;
-        } else {
-          out.push(line.trimEnd());
-          line = word.trimStart();
+        if (fits(line + word)) { line += word; continue; }
+        if (/^\s+$/.test(word)) { out.push(line.trimEnd()); line = ''; continue; }
+        if (line.trim()) out.push(line.trimEnd());
+        // The word alone may still be too wide (a URL, a long name): hard-break it.
+        let chunk = '';
+        for (const ch of word) {
+          if (chunk && !fits(chunk + ch)) { out.push(chunk); chunk = ''; }
+          chunk += ch;
         }
+        line = chunk;
       }
       out.push(line.trimEnd());
     }
@@ -76,7 +72,7 @@
       c.textBaseline = 'middle';
       c.fillStyle = '#8dffad';
       c.fillText('EMERGENCY BRAKE TERMINAL v2.0', 10, 15);
-      const statusColors = { ACCEPTED: '#5dff8a', REJECTED: '#ff5a4f', VERIFYING: '#ffc53d', RECEIVING: '#8de1ff', STANDBY: '#8dffad', BLOCKED: '#d58cff', OFFLINE: '#ff5a4f' };
+      const statusColors = { ACCEPTED: '#5dff8a', REJECTED: '#ff5a4f', VERIFYING: '#ffc53d', RECEIVING: '#8de1ff', STANDBY: '#8dffad', BLOCKED: '#d58cff', OFFLINE: '#ff5a4f', TOOL: '#ffb347' };
       const st = s.status + (s.mode === 'verifying' ? '.'.repeat(this.dots) : '');
       c.fillStyle = statusColors[s.status] || '#8dffad';
       c.textAlign = 'right';
@@ -120,7 +116,7 @@
 
       // verdict banner
       if (s.banner) {
-        const col = { ACCEPTED: ['#0f5e2b', '#5dff8a'], REJECTED: ['#5e1410', '#ff6a5f'], BLOCKED: ['#3d1458', '#d58cff'], VERIFYING: ['#5a4307', '#ffc53d'] }[s.status] || ['#333', '#fff'];
+        const col = { ACCEPTED: ['#0f5e2b', '#5dff8a'], REJECTED: ['#5e1410', '#ff6a5f'], BLOCKED: ['#3d1458', '#d58cff'], VERIFYING: ['#5a4307', '#ffc53d'], TOOL: ['#5a3307', '#ffb347'] }[s.status] || ['#333', '#fff'];
         c.fillStyle = col[0];
         c.globalAlpha = 0.92;
         c.fillRect(20, 140, W - 40, 104);
@@ -131,6 +127,8 @@
         c.fillStyle = col[1];
         c.textAlign = 'center';
         c.font = 'bold 30px ' + MONO;
+        let bs = 30;
+        while (c.measureText(s.banner).width > W - 60 && bs > 14) { bs -= 2; c.font = 'bold ' + bs + 'px ' + MONO; }
         c.fillText(s.banner, W / 2, 178);
         c.font = '14px ' + MONO;
         const sub = wrap(c, s.bannerSub || '', W - 70).slice(0, 2);
@@ -153,6 +151,7 @@
       this.base = document.createElement('canvas');
       this.base.width = 1024; this.base.height = 544;
       this.song = 'Song'; this.artist = 'Artist';
+      this.line1 = GB.Prompts.SIGN_LINE1; this.line2 = GB.Prompts.SIGN_LINE2;
       this.clockText = '01:00.0';
       this.lastClock = '';
       this._drawBase();
@@ -160,8 +159,10 @@
       this.tex = R.createTexture(this.canvas, true);
     }
 
-    setSong(song, artist) {
+    setSong(song, artist, line1, line2) {
       this.song = song || 'Untitled'; this.artist = artist || 'Unknown';
+      this.line1 = String(line1 != null ? line1 : GB.Prompts.SIGN_LINE1).toUpperCase();
+      this.line2 = String(line2 != null ? line2 : GB.Prompts.SIGN_LINE2).toUpperCase();
       this._drawBase(); this._compose(); this.tex.update();
     }
 
@@ -209,16 +210,16 @@
       c.fillText('EMERGENCY BRAKE', W / 2, 45);
 
       c.fillStyle = '#3a210c';
-      c.font = '700 34px ' + SANS;
-      c.fillText('THIS TRAIN ONLY STOPS IF THE LYRICS TO', W / 2, 128);
+      this._fit(c, this.line1, W - 80, 34, '700', SANS);
+      c.fillText(this.line1, W / 2, 128);
       c.fillStyle = '#8c1c13';
       this._fit(c, '“' + this.song.toUpperCase() + '”', W - 80, 72, '900', SANS);
       c.fillText('“' + this.song.toUpperCase() + '”', W / 2, 200);
       c.fillStyle = '#3a210c';
       this._fit(c, 'BY ' + this.artist.toUpperCase(), W - 120, 40, '800', SANS);
       c.fillText('BY ' + this.artist.toUpperCase(), W / 2, 262);
-      c.font = '700 32px ' + SANS;
-      c.fillText('ARE TYPED INTO THE TERMINAL', W / 2, 314);
+      this._fit(c, this.line2, W - 80, 32, '700', SANS);
+      c.fillText(this.line2, W / 2, 314);
 
       // border
       c.strokeStyle = '#5b3517'; c.lineWidth = 14; c.strokeRect(7, 7, W - 14, H - 14);
@@ -244,5 +245,17 @@
     }
   }
 
-  GB.Screens = { Terminal, Sign, wrap };
+  // Small static two-line text plate (the label on the emergency brake panel).
+  function labelTexture(R, top, bottom, fg, bg) {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const x = c.getContext('2d');
+    x.fillStyle = bg; x.fillRect(0, 0, 256, 64);
+    x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = '900 25px ' + SANS; x.fillText(top, 128, 22);
+    x.font = '800 17px ' + SANS; x.fillText(bottom, 128, 48);
+    return R.createTexture(c, true);
+  }
+
+  GB.Screens = { Terminal, Sign, wrap, labelTexture };
 })(window.GB = window.GB || {});

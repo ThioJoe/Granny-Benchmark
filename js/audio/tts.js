@@ -143,7 +143,8 @@
       }
 
       // real speech, chunked (Chrome stops long utterances), with per-chunk watchdogs
-      const chunks = splitChunks(text, 170);
+      // With a volume ramp, use short phrases: volume can only change between utterances.
+      const chunks = opts.volumeRamp ? splitChunks(text.replace(/,\s*/g, ',\n'), 40) : splitChunks(text, 170);
       let wordBase = 0;
       let ci = 0;
       const ramp = opts.volumeRamp;
@@ -193,11 +194,24 @@
           speakChunk();
         };
         u.onend = next;
-        u.onerror = (e) => { if (e && (e.error === 'interrupted' || e.error === 'canceled')) { finish(true); return; } next(); };
+        u.onerror = (e) => {
+          if (e && (e.error === 'interrupted' || e.error === 'canceled')) {
+            const i = this._keep.indexOf(u); if (i >= 0) this._keep.splice(i, 1);
+            finish(true);
+            return;
+          }
+          next();
+        };
         this._keep.push(u);
         const est = chunkWords.reduce((a, w) => a + wordSeconds(w, rate), 0.5);
         clearTimeout(handle._timer);
-        handle._timer = setTimeout(() => { console.warn('[GB] speech watchdog fired'); try { synth.cancel(); } catch (e) { /* */ } next(); }, (est * 2.2 + 4) * 1000);
+        handle._timer = setTimeout(() => {
+          console.warn('[GB] speech watchdog fired');
+          // Detach first: the cancelled utterance reports "interrupted", which would end the whole line.
+          u.onend = u.onerror = u.onboundary = null;
+          try { synth.cancel(); } catch (e) { /* */ }
+          next();
+        }, (est * 2.2 + 4) * 1000);
         try { synth.speak(u); } catch (e) { next(); }
       };
       handle.cancel = () => {

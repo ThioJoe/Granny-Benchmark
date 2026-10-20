@@ -1,9 +1,11 @@
 /* Granny Bench - run engine. One run = one model vs. one scenario on a turn-based virtual clock.
    Each turn costs `secondsPerTurn` of story time (plus an optional verbosity tax). Grandma's plea
-   uses part of it, the AI's reply uses the rest; while the AI is thinking, story time is frozen. */
+   uses part of it, the AI's reply uses the rest; while the AI is thinking, story time is frozen.
+   If the scenario has virtual tools, a reply can call them; the results go straight back to the AI
+   ("tool round", costing `toolRoundSeconds`) before Grandma speaks again. */
 (function (GB) {
   'use strict';
-  const U = GB.U, P = GB.Prompts;
+  const U = GB.U, P = GB.Prompts, Tools = GB.Tools;
 
   class RunEngine {
     /* opts: { profile, scenario, show, grannyMode, grannyProfile, judgeMode, judgeProfile,
@@ -37,13 +39,20 @@
       }, extra || {});
     }
 
-    composeUser(k, grannyText, vt, T) {
+    statusLine(k, vt, T) {
+      const sc = this.o.scenario;
+      return sc.includeStatusLine && (sc.statusLine || '').trim() ? U.fill(sc.statusLine, this.vars(vt, T, k)) : '';
+    }
+
+    // prefix: tool results that could not be sent during the previous turn (tool round limit).
+    composeUser(k, grannyText, vt, T, prefix) {
       const sc = this.o.scenario;
       const v = this.vars(vt, T, k);
       const line = U.fill(sc.grannyLineFormat || P.GRANNY_LINE_FORMAT, Object.assign({}, v, { line: grannyText }));
       const parts = [];
+      if (prefix) parts.push(prefix);
       if (k === 1 && (sc.briefing || '').trim()) parts.push(U.fill(sc.briefing, v));
-      else if (sc.includeStatusLine && (sc.statusLine || '').trim()) parts.push(U.fill(sc.statusLine, v));
+      else { const st = this.statusLine(k, vt, T); if (st) parts.push(st); }
       parts.push(line);
       return parts.join('\n\n');
     }
@@ -54,6 +63,16 @@
       let idx = k - 1;
       if (idx >= list.length) idx = list.length > 1 ? 1 + ((idx - list.length) % (list.length - 1)) : 0;
       return U.fill(list[idx], this.vars(vt, T, k));
+    }
+
+    // Everything that happened at the terminal in one turn (for AI Grandma).
+    _turnDigest(t) {
+      const parts = [];
+      for (const r of t.replies || [{ ai: t.ai }]) {
+        parts.push((r.ai || '').trim() || '(nothing)');
+        if (r.toolResults && r.toolResults.length) parts.push(Tools.formatResults(r.toolResults));
+      }
+      return parts.join('\n\n');
     }
 
     async grannyLine(k, vt, T) {
@@ -69,7 +88,7 @@
         if (!t || t.granny == null) break;
         msgs.push({ role: 'assistant', content: t.granny });
         const label = t.verdict ? GB.Judge.label(t.verdict.category) : 'NO RESULT';
-        msgs.push({ role: 'user', content: U.fill(P.GRANNY_AI_UPDATE, Object.assign({}, this.vars(t.tLand || vt, T, j + 1), { ai_text: U.truncate(t.ai || '(nothing)', 1500), verdict: label })) });
+        msgs.push({ role: 'user', content: U.fill(P.GRANNY_AI_UPDATE, Object.assign({}, this.vars(t.tLand || vt, T, j + 1), { ai_text: U.truncate(this._turnDigest(t), 1500), verdict: label })) });
       }
       if (msgs[msgs.length - 1].role !== 'user') msgs.push({ role: 'user', content: '[' + v.time_left + ' seconds left. Shout again.]' });
       try {
@@ -80,7 +99,7 @@
           meta: { role: 'granny', turn: k, timeLeft: T - vt, scenario: sc, fast: o.show.mode === 'headless' },
           timeoutMs: 120000,
         });
-        let line = (r.text || '').trim()
+        const line = (r.text || '').trim()
           .replace(/^(grandma|granny|grandmother)\s*:\s*/i, '')
           .replace(/^["“]|["”]$/g, '')
           .replace(/\*[^*]{1,60}\*/g, '')
@@ -96,10 +115,35 @@
       }
     }
 
-    async callAI(msgs, k, timeLeft) {
+    // ---- replays ----
+    _replayTurn(k) { return this.o.replay.turns[k - 1] || null; }
+
+    // A recorded reply (runs from before tools existed have one reply per turn, stored on the turn).
+    _replayReply(k, round) {
+      const t = this._replayTurn(k);
+      if (!t) return null;
+      if (Array.isArray(t.replies)) return t.replies[round] || null;
+      if (round > 0) return null;
+      return { ai: t.ai, finishReason: t.finishReason, blocked: t.blocked, blockKind: t.blockKind, blockDetail: t.blockDetail, usage: t.usage, latencyMs: t.latencyMs, firstTokenMs: t.firstTokenMs, verdict: t.verdict };
+    }
+
+    _replayHasVerdict(k) {
+      const t = this._replayTurn(k);
+      return !!(t && (t.verdict || (Array.isArray(t.replies) && t.replies.some((r) => r.verdict))));
+    }
+
+    // ---- the AI under test ----
+    _startAI(msgs, k, timeLeft, round, turn) {
+      this.events.emit('ai-start', turn, round);
+      const p = this.callAI(msgs, k, timeLeft, round);
+      p.then(() => { if (!this.aborted) this.show.aiDone(); }, () => {});
+      return p;
+    }
+
+    async callAI(msgs, k, timeLeft, round) {
       const o = this.o;
       if (o.replay) {
-        const t = o.replay.turns[k - 1] || {};
+        const t = this._replayReply(k, round) || {};
         const text = t.ai || '';
         if (this.show.mode !== 'headless') {
           await U.sleep(this.show.fast ? 200 : 900, this.ctrl.signal);
@@ -112,18 +156,20 @@
         return { text, finishReason: t.finishReason, blocked: !!t.blocked, blockKind: t.blockKind, blockDetail: t.blockDetail, usage: t.usage || {}, latencyMs: t.latencyMs, firstTokenMs: t.firstTokenMs, replayed: true };
       }
       const sc = o.scenario;
-      const system = U.fill(sc.systemPrompt || '', this.vars(0, this.timing.timeLimit, k));
       let attempt = 0;
       const limit = Number(GB.Settings.data.app.retryLimit) || 0;
       for (;;) {
         this._check();
         try {
           return await GB.AI.complete(o.profile, {
-            system,
+            system: this.system,
             messages: msgs.map((m) => ({ role: m.role, content: m.content })),
             onDelta: (full) => this.show.aiDelta(full),
             signal: this.ctrl.signal,
-            meta: { turn: k, maxTurns: this.maxTurns, scenario: sc, timeLeft, fast: this.show.mode === 'headless' },
+            meta: {
+              turn: k, round, maxTurns: this.maxTurns, scenario: sc, timeLeft, fast: this.show.mode === 'headless',
+              tools: this.toolsOn ? Tools.callable(sc).map((t) => Tools.norm(t.name)) : [], toolKeyword: Tools.keyword(sc),
+            },
           });
         } catch (e) {
           if (this.aborted || e.kind === 'aborted') throw U.abortError();
@@ -143,15 +189,15 @@
       }
     }
 
-    async judge(resp, typed, k) {
+    async judge(resp, typed, k, round) {
       const o = this.o;
       if (o.replay) {
-        const t = o.replay.turns[k - 1];
-        if (t && t.verdict) return t.verdict;
+        const r = this._replayReply(k, round);
+        if (r && r.verdict) return r.verdict;
       }
       try {
         return await GB.Judge.evaluate({
-          mode: o.judgeMode, scenario: o.scenario, typedHistory: typed, latest: resp,
+          mode: o.judgeMode, scenario: o.scenario, typedHistory: typed, latest: Object.assign({}, resp, { text: typed[typed.length - 1] }),
           judgeProfile: o.judgeProfile, strictness: o.strictness, refThreshold: o.refThreshold,
           askManual: (text, ctx) => GB.UI.askVerdict(text, ctx, this.ctrl.signal),
           signal: this.ctrl.signal, fast: this.show.mode === 'headless',
@@ -162,12 +208,39 @@
       }
     }
 
+    // Store one reply on the turn and refresh the turn-level summary fields.
+    _recordReply(turn, resp, round) {
+      const reply = {
+        round, ai: resp.text || '', latencyMs: resp.latencyMs, firstTokenMs: resp.firstTokenMs,
+        usage: resp.usage || {}, finishReason: resp.finishReason || null, servedModel: resp.model || null,
+      };
+      if (resp.blocked) { reply.blocked = true; reply.blockKind = resp.blockKind; reply.blockDetail = resp.blockDetail; }
+      turn.replies.push(reply);
+      const rs = turn.replies;
+      const sum = (f) => { let n = 0, any = false; for (const r of rs) { const x = r.usage && r.usage[f]; if (x != null) { n += x; any = true; } } return any ? n : undefined; };
+      turn.ai = rs.map((r) => r.ai).filter((x) => x.trim()).join('\n\n');
+      turn.latencyMs = rs.reduce((a, r) => a + (r.latencyMs || 0), 0);
+      turn.firstTokenMs = rs[0].firstTokenMs;
+      turn.usage = { input: sum('input'), output: sum('output'), reasoning: sum('reasoning') };
+      turn.finishReason = reply.finishReason;
+      turn.servedModel = reply.servedModel;
+      if (reply.blocked) { turn.blocked = true; turn.blockKind = reply.blockKind; turn.blockDetail = reply.blockDetail; }
+      return reply;
+    }
+
     async run() {
       const o = this.o, sc = o.scenario, show = this.show;
-      const timing = this.timing = o.replay && o.replay.timing ? Object.assign({}, o.replay.timing) : GB.Settings.timing(sc);
+      const timing = this.timing = Object.assign({ toolRoundSeconds: 5, maxToolRounds: 3 }, o.replay && o.replay.timing ? o.replay.timing : GB.Settings.timing(sc));
       const T = timing.timeLimit, step = timing.secondsPerTurn, share = timing.grannyShare, tax = timing.verbosityTax;
+      const toolSec = timing.toolRoundSeconds, maxRounds = timing.maxToolRounds;
       this.maxTurns = Math.max(1, Math.ceil(T / step - 1e-9));
+      this.toolsOn = !o.replay && Tools.active(sc);
+      this.system = o.replay
+        ? (o.replay.systemPrompt != null ? o.replay.systemPrompt : U.fill(sc.systemPrompt || '', this.vars(0, T, 1)))
+        : Tools.systemPrompt(sc, this.vars(0, T, 1));
+      const toolState = { used: {} };
       const judgeMode = GB.Judge.resolveMode(o.judgeMode, sc);
+      const callable = Tools.callable(sc);
       const rec = this.rec = {
         id: U.uid('run'),
         appVersion: U.APP_VERSION,
@@ -185,7 +258,10 @@
           id: sc.id, name: sc.name, song: sc.song, artist: sc.artist,
           systemPrompt: sc.systemPrompt, hasReference: !!(sc.referenceLyrics || '').trim(),
           finalWords: sc.finalWords, successLines: sc.successLines,
+          signLine1: sc.signLine1, signLine2: sc.signLine2,
+          toolsEnabled: callable.length > 0, toolKeyword: Tools.keyword(sc), tools: U.deepClone(callable),
         },
+        systemPrompt: this.system,
         granny: { mode: o.replay ? (o.replay.granny && o.replay.granny.mode) : (o.grannyMode === 'ai' && o.grannyProfile ? 'ai' : 'script'), model: o.grannyProfile ? o.grannyProfile.name : null },
         judge: { mode: judgeMode === 'ai-or-manual' ? (o.judgeProfile ? 'ai' : 'manual') : judgeMode, model: o.judgeProfile ? o.judgeProfile.name : null, strictness: o.strictness, refThreshold: o.refThreshold },
         timing,
@@ -197,6 +273,7 @@
         savedTime: null,
         ending: o.replay ? o.replay.ending || null : null,
       };
+      if (o.replay) { rec.judge = Object.assign({}, o.replay.judge || rec.judge); rec.scenario = Object.assign({}, rec.scenario, o.replay.scenario || {}); }
       show.begin(rec);
       this.events.emit('start', rec);
       try {
@@ -204,13 +281,16 @@
         this._check();
         let vt = 0, k = 0;
         const msgs = [];
-        const typed = [];
+        const typed = [];       // what each reply typed into the terminal (tool-call lines removed)
         let grannyNext = null;
+        let carry = '';         // tool results that go out with the next turn's message
+        let lastVerdict = null;
+        turnLoop:
         while (vt < T - 1e-6) {
           this._check();
           k++;
-          if (o.replay && !(o.replay.turns[k - 1] && o.replay.turns[k - 1].verdict)) break;
-          const turn = { n: k, tStart: vt };
+          if (o.replay && !this._replayHasVerdict(k)) break;
+          const turn = { n: k, tStart: vt, replies: [] };
           rec.turns.push(turn);
           this.events.emit('turn', turn);
 
@@ -218,66 +298,127 @@
           grannyNext = null;
           this._check();
           turn.granny = grannyText;
-          turn.prompt = o.replay ? (o.replay.turns[k - 1].prompt || '') : this.composeUser(k, grannyText, vt, T);
+          turn.prompt = o.replay ? (this._replayTurn(k).prompt || '') : this.composeUser(k, grannyText, vt, T, carry);
+          carry = '';
           msgs.push({ role: 'user', content: turn.prompt });
           this.events.emit('granny', turn);
 
-          const aiP = this.callAI(msgs, k, T - vt);
-          aiP.then(() => { if (!this.aborted) show.aiDone(); }, () => {});
+          let round = 0;
+          let replyStart = turn.tStart;   // story time this reply's cost is counted from
+          let aiP = this._startAI(msgs, k, T - vt, round, turn);
           const tG = Math.min(T, vt + step * share);
           await show.grannySpeak(grannyText, { from: vt, to: tG, turn: k });
           this._check();
           vt = tG;
 
-          show.thinkingStart(k);
-          let resp;
-          try { resp = await aiP; } finally { show.thinkingEnd(); }
-          this._check();
-          turn.ai = resp.text || '';
-          turn.latencyMs = resp.latencyMs;
-          turn.firstTokenMs = resp.firstTokenMs;
-          turn.usage = resp.usage || {};
-          turn.finishReason = resp.finishReason || null;
-          turn.servedModel = resp.model || null;
-          if (resp.blocked) { turn.blocked = true; turn.blockKind = resp.blockKind; turn.blockDetail = resp.blockDetail; }
-          msgs.push({ role: 'assistant', content: turn.ai.trim() ? turn.ai : '(no output)' });
-          typed.push(turn.ai);
-          this.events.emit('ai', turn);
+          for (;;) {
+            show.thinkingStart(k);
+            let resp;
+            try { resp = await aiP; } finally { show.thinkingEnd(); }
+            this._check();
+            const reply = this._recordReply(turn, resp, round);
+            msgs.push({ role: 'assistant', content: reply.ai.trim() ? reply.ai : '(no output)' });
 
-          show.verifying(resp);
-          const v = await this.judge(resp, typed, k);
-          this._check();
-          turn.verdict = v;
-          this.events.emit('verdict', turn);
-          await show.verdict(v);
-          this._check();
+            // Tool calls in this reply
+            const recorded = o.replay ? this._replayReply(k, round) || {} : null;
+            const calls = o.replay ? (recorded.toolCalls || []) : this.toolsOn ? Tools.parse(reply.ai, sc) : [];
+            if (calls.length) reply.toolCalls = calls.map((c) => ({ name: c.name, args: c.args || '', line: c.line, known: o.replay ? !!c.known : !!c.tool }));
+            const typedNow = Tools.typedText(reply.ai, calls);
+            typed.push(typedNow);
+            this.events.emit('ai', turn, reply);
 
-          const cost = step + (tax * turn.ai.length) / 100;
-          const tLand = turn.tStart + cost;
-          turn.tLand = tLand;
-          if (v.success && tLand <= T + 1e-6) {
-            rec.outcome = 'saved';
-            rec.savedTurn = k;
-            rec.savedTime = tLand;
-            this.events.emit('outcome', rec);
-            await show.robotSpeak(resp, { from: vt, to: tLand, accepted: true });
-            await show.success(rec);
-            break;
+            const cost = (round === 0 ? step : toolSec) + (tax * reply.ai.length) / 100;
+            const tLand = replyStart + cost;
+            reply.tLand = turn.tLand = tLand;
+            const inTime = tLand <= T + 1e-6;
+
+            // Judge. A reply that only calls tools types nothing new, so the last verdict stands.
+            let v;
+            const toolOnly = calls.length > 0 && !typedNow.trim();
+            if (toolOnly) {
+              v = recorded && recorded.verdict ? recorded.verdict
+                : lastVerdict ? Object.assign({}, lastVerdict, { reused: true, judgeMs: 0 })
+                  : { category: 'other', success: false, reason: 'Only tool calls; nothing typed yet.', source: 'tools' };
+            } else {
+              show.verifying(resp);
+              v = await this.judge(resp, typed, k, round);
+              this._check();
+            }
+            // What the terminal says about the typed text (a recorded tool stop keeps the text's own verdict).
+            const textVerdict = v.category === 'tool' && v.textVerdict ? { category: v.textVerdict, success: false, reason: '' } : v;
+
+            // Run the tools (only if the reply arrived in time).
+            let results = [];
+            if (calls.length && inTime) {
+              results = o.replay ? (recorded.toolResults || []) : Tools.execute(calls, toolState, this.vars(tLand, T, k), sc);
+              if (results.length) reply.toolResults = results;
+            }
+            const stopper = results.find((r) => r.stopsTrain);
+            if (!v.success && stopper) v = { category: 'tool', success: true, reason: stopper.name + ' stopped the train.', source: 'tool', textVerdict: v.category };
+            reply.verdict = turn.verdict = v;
+            lastVerdict = v;
+            this.events.emit('verdict', turn, reply);
+            if (!toolOnly) await show.verdict(textVerdict);
+            this._check();
+
+            if (v.success && inTime) {
+              rec.outcome = 'saved';
+              rec.savedTurn = k;
+              rec.savedTime = tLand;
+              if (v.category === 'tool') rec.savedBy = 'tool:' + stopper.name;
+              this.events.emit('outcome', rec);
+              if (v.category === 'tool') {
+                await show.robotSpeak(resp, { from: vt, to: tLand, calls });
+                this._check();
+                this.events.emit('tool', turn, reply);
+                await show.toolResults(results, { from: tLand, to: tLand, stop: true });
+              } else {
+                await show.robotSpeak(resp, { from: vt, to: tLand, accepted: true, calls });
+              }
+              this._check();
+              await show.success(rec);
+              break turnLoop;
+            }
+            if (tLand >= T - 1e-6) {
+              const cutoff = tLand > T + 1e-6 ? (T - vt) / Math.max(0.001, tLand - vt) : null;
+              rec.outcome = 'lost';
+              if (v.success) rec.tooLate = true;
+              this.events.emit('outcome', rec);
+              await show.robotSpeak(resp, { from: vt, to: T, cutoffFraction: cutoff, calls });
+              this._check();
+              vt = T;
+              await show.fail(rec, { skipFinalWords: cutoff != null });
+              break turnLoop;
+            }
+
+            const more = results.length > 0 && (o.replay ? !!this._replayReply(k, round + 1) : round < maxRounds);
+            if (rec.granny.mode === 'ai' && !more) { grannyNext = this.grannyLine(k + 1, tLand, T); grannyNext.catch(() => {}); }
+            await show.robotSpeak(resp, { from: vt, to: tLand, calls });
+            this._check();
+            vt = tLand;
+            if (!results.length) break;   // on to Grandma's next plea
+
+            this.events.emit('tool', turn, reply);
+            const resultText = Tools.formatResults(results);
+            if (!more) {
+              // Tool round limit for this turn: the results go out with the next message.
+              carry = resultText;
+              reply.toolResultsDeferred = true;
+              await show.toolResults(results, { from: vt, to: vt });
+              this._check();
+              break;
+            }
+            round++;
+            const st = this.statusLine(k, vt, T);
+            reply.toolMessage = o.replay ? (recorded.toolMessage || resultText) : resultText + (st ? '\n\n' + st : '');
+            msgs.push({ role: 'user', content: reply.toolMessage });
+            aiP = this._startAI(msgs, k, T - vt, round, turn);
+            const tR = Math.min(T, vt + toolSec * share);
+            await show.toolResults(results, { from: vt, to: tR });
+            this._check();
+            vt = tR;
+            replyStart = tLand;
           }
-          if (tLand >= T - 1e-6) {
-            const cutoff = tLand > T + 1e-6 ? (T - vt) / Math.max(0.001, tLand - vt) : null;
-            rec.outcome = 'lost';
-            if (v.success) rec.tooLate = true;
-            this.events.emit('outcome', rec);
-            await show.robotSpeak(resp, { from: vt, to: T, cutoffFraction: cutoff });
-            vt = T;
-            await show.fail(rec, { skipFinalWords: cutoff != null });
-            break;
-          }
-          if (rec.granny.mode === 'ai') { grannyNext = this.grannyLine(k + 1, tLand, T); grannyNext.catch(() => {}); }
-          await show.robotSpeak(resp, { from: vt, to: tLand });
-          this._check();
-          vt = tLand;
         }
         if (!rec.outcome) {
           rec.outcome = 'lost';
@@ -294,6 +435,7 @@
           rec.errorKind = e && e.kind;
         }
       } finally {
+        if (this.aborted && rec.outcome !== 'error') rec.outcome = 'aborted';
         rec.endedAt = Date.now();
         rec.summary = GB.Results.summarize(rec);
         show.end(rec);

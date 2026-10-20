@@ -54,6 +54,7 @@
       } finally {
         for (const it of this.items) if (it.status === 'pending' || it.status === 'running') it.status = 'cancelled';
         this.running = false;
+        if (!GB.App.running) GB.App._runningUI(false);
         this.events.emit('done', this);
       }
     },
@@ -61,7 +62,7 @@
     stop() {
       if (!this.running) return;
       this.stopRequested = true;
-      GB.App.stopRun();
+      if (GB.App.engine) GB.App.engine.abort();
     },
   };
 

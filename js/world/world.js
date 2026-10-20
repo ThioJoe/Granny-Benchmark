@@ -10,6 +10,8 @@
   const TRAIN_PARK = 270;           // where it waits before a run
   const IMPACT_DIST = 0.42;
   const STOP_GAP = 0.9;             // closest a braking train gets
+  const PANEL_POS = [7.3, 0, 2.45]; // emergency brake panel (shown when a scenario has a "glass" tool)
+  const PANEL_YAW = -1.03;          // faces back toward the track and the default cameras
 
   // Flat five-pointed star facing +Z (billboarded at runtime).
   function starGeo(rOut, rIn, depth, color) {
@@ -93,6 +95,8 @@
       this.blink = { granny: 2, robot: 3 };
       this.tower = null;
       this.cheer = 0;
+      this.alarmUntil = 0;
+      this.panelBroken = false;
     }
 
     init(canvas, opts) {
@@ -138,6 +142,23 @@
       this.relay.rig.at(1.65, 0, 2.6);
       scene.add(this.relay.rig);
       scene.add(M.cable(R, [[1.9, 0.03, 2.6], [3.5, 0.03, 2.3], [5.4, 0.03, 2.15], [7.69, 0.03, 2.05], [7.69, 0.03, 1.88], [7.69, 0.74, 1.88], [7.86, 0.98, 1.4]]));
+
+      // emergency brake panel (for tool scenarios)
+      this.panel = M.brakePanel(R);
+      this.panel.rig.at(PANEL_POS[0], PANEL_POS[1], PANEL_POS[2]).rot(0, PANEL_YAW, 0);
+      this.panel.label.material.texture = GB.Screens.labelTexture(R, 'EMERGENCY BRAKE', 'BREAK GLASS · PULL HANDLE', '#ffffff', '#b8261c');
+      this.panel.rig.visible = false;
+      scene.add(this.panel.rig);
+      const shardMesh = R.createMesh(G.box(0.07, 0.05, 0.006, '#d4f0ff'));
+      this.shards = new Pool(scene, shardMesh, 36, { emissive: [0.25, 0.3, 0.34] }, (it, dt) => {
+        const p = it.node.position;
+        if (p[1] > 0.012) {
+          it.vel[1] -= 9.8 * dt;
+          p[0] += it.vel[0] * dt; p[1] += it.vel[1] * dt; p[2] += it.vel[2] * dt;
+          it.node.rotation[0] += it.spin[0] * dt; it.node.rotation[1] += it.spin[1] * dt;
+          if (p[1] <= 0.012) { p[1] = 0.012; it.node.rotation[0] = PI / 2; it.vel[0] = it.vel[2] = 0; }
+        }
+      });
 
       // train
       this.train = M.train(R);
@@ -207,13 +228,21 @@
     // ---------------------------------------------------------------------------
     // public API used by the show / UI
     // ---------------------------------------------------------------------------
-    setScenario(sc) { if (this.ready) this.sign.setSong(sc.song, sc.artist); }
+    setScenario(sc) {
+      if (!this.ready) return;
+      const key = [sc.song, sc.artist, sc.signLine1, sc.signLine2].join('\u0001');
+      if (key !== this._signKey) { this._signKey = key; this.sign.setSong(sc.song, sc.artist, sc.signLine1, sc.signLine2); }
+      // The brake panel only appears in scenarios that have a tool which breaks its glass.
+      const tools = GB.Tools ? GB.Tools.callable(sc) : [];
+      this.panel.rig.visible = tools.some((t) => t.effect === 'glass');
+    }
     setClock(secondsLeft) { if (this.ready) this.sign.setClock(secondsLeft); }
     setTerminal(patch) { if (this.ready) this.terminal.set(patch); }
     setTimeScale(s) { this.targetTimeScale = s; }
     setTrainDistance(d) { this.trainDist = d; }
     distanceFor(vt, T) { return STOP_GAP + 3.2 + (TRAIN_START - STOP_GAP - 3.2) * (1 - U.clamp(vt / T, 0, 1)); }
     setRelay(color) {
+      this._relayColor = color;
       const c = { red: [0.8, 0.05, 0.05], green: [0.1, 0.9, 0.25], amber: [0.9, 0.6, 0.05] }[color] || [0.8, 0.05, 0.05];
       this.relay.lamp.material.emissive = c;
       this.relay.lamp.material.tint = color === 'green' ? [0.3, 1, 0.4] : color === 'amber' ? [1, 0.8, 0.3] : [1, 0.25, 0.25];
@@ -249,10 +278,16 @@
       this.granny.head.rot(0, 0, 0);
       for (const h of this.carHome) { h.node.position = h.pos.slice(); h.node.rotation = h.rot.slice(); }
       this.trainDist = TRAIN_PARK;
+      this.train.root.position[2] = TRAIN_PARK;
+      this.trainSpeed = 0;
       this.star.visible = false;
       this.starCam = null;
       for (const c of this.pathClouds) c.visible = false;
-      this.smoke.clear(); this.sparks.clear(); for (const p of this.confetti) p.clear();
+      this.smoke.clear(); this.sparks.clear(); this.shards.clear(); for (const p of this.confetti) p.clear();
+      this.panelBroken = false;
+      this.panel.glass.visible = true;
+      this.panel.handle.rotation[0] = 0;
+      this.alarmUntil = 0;
       this.setRelay('red');
       this.setTimeScale(1);
       this.robotLook = 'screen';
@@ -288,6 +323,32 @@
       this.braking = false;
       this.trainRunning = false;
       this.trainSpeed = 0;
+    }
+
+    // A virtual tool was used: 'glass' smashes the brake panel's cover, 'alarm' flashes the lights.
+    toolEffect(kind) {
+      if (!this.ready) return;
+      if (kind === 'glass') {
+        this.panel.rig.visible = true;
+        this.alarmUntil = this.t + 6;
+        if (this.panelBroken) return;
+        this.panelBroken = true;
+        this.panel.glass.visible = false;
+        const origin = this.panel.glass.localToWorld([0, 0, 0]);
+        const fwd = [Math.sin(PANEL_YAW), 0, Math.cos(PANEL_YAW)];
+        for (let i = 0; i < 30; i++) {
+          const p = [origin[0] + U.rand(-0.18, 0.18) * fwd[2], origin[1] + U.rand(-0.22, 0.22), origin[2] - U.rand(-0.18, 0.18) * fwd[0]];
+          const sp = U.rand(0.6, 2.2);
+          const v = [fwd[0] * sp + U.rand(-0.6, 0.6), U.rand(0.2, 1.8), fwd[2] * sp + U.rand(-0.6, 0.6)];
+          const it = this.shards.spawn(p, v, 9, 1, [U.rand(-12, 12), U.rand(-12, 12), 0]);
+          const s = U.rand(0.5, 1.4);
+          it.node.scl(s, s, 1);
+        }
+        // pull the handle a moment later
+        setTimeout(() => { if (this.panelBroken) this.animate(0.35, (u) => { this.panel.handle.rotation[0] = 1.25 * u; }, U.ease.out); }, 450);
+      } else if (kind === 'alarm') {
+        this.alarmUntil = this.t + 6;
+      }
     }
 
     // Approach the last few meters and hit (resolves at the moment of impact).
@@ -435,6 +496,14 @@
       this._updateRobot(dt);
       this.smoke.update(sdt);
       this.sparks.update(sdt);
+      this.shards.update(dt);
+      // alarm: the panel beacon and the relay lamp flash
+      const alarm = this.t < this.alarmUntil;
+      const on = alarm && Math.sin(this.t * 14) > 0;
+      this.panel.beacon.material.emissive = on ? [1, 0.25, 0.08] : [0.15, 0.02, 0];
+      if (alarm) this.relay.lamp.material.emissive = on ? [1, 0.1, 0.05] : [0.1, 0.01, 0.01];
+      else if (this._alarmWas) this.setRelay(this._relayColor || 'red');
+      this._alarmWas = alarm;
       for (const p of this.confetti) p.update(dt);
       for (const c of this.clouds) { c.position[0] += dt * 1.2; if (c.position[0] > 520) c.position[0] = -520; }
       if (this.star.visible) {
@@ -460,7 +529,9 @@
       tr.root.position[0] = 0;
       tr.root.position[1] = 0.3;
       tr.root.position[2] = this.trainDist;
-      const v = dt > 0 ? Math.abs(prevZ - this.trainDist) / dt : 0;
+      // A jump of more than 20 m in one frame is a teleport (reset, replay start), not speed.
+      const jump = Math.abs(prevZ - this.trainDist);
+      const v = dt > 0 && jump < 20 ? jump / dt : 0;
       this.trainSpeed += (v - this.trainSpeed) * Math.min(1, dt * 6);
       // In slow motion the train is frozen in time, but its wheels still creep.
       const creep = this.trainRunning ? 5 * this.timeScale * (this.timeScale < 0.5 ? 1 : 0) : 0;
@@ -562,7 +633,13 @@
         while (yaw < -PI) yaw += 2 * PI;
       }
       if (this.robotTyping) pitch = 0.15;
-      r.head.rotation[1] += (yaw - r.head.rotation[1]) * Math.min(1, dt * 5);
+      // Turn the short way round.
+      let dy = yaw - r.head.rotation[1];
+      while (dy > PI) dy -= 2 * PI;
+      while (dy < -PI) dy += 2 * PI;
+      r.head.rotation[1] += dy * Math.min(1, dt * 5);
+      if (r.head.rotation[1] > PI) r.head.rotation[1] -= 2 * PI;
+      else if (r.head.rotation[1] < -PI) r.head.rotation[1] += 2 * PI;
       r.head.rotation[0] += (pitch - r.head.rotation[0]) * Math.min(1, dt * 5);
       r.head.rotation[2] = this.robotThinking ? Math.sin(t * 3) * 0.08 : 0;
       r.body.position[1] = 0.49 + Math.sin(t * 2) * 0.004;

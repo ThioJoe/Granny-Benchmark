@@ -4,9 +4,35 @@
   const U = GB.U, Store = GB.Store;
   const KEY = 'results.v1';
 
-  const CATS = ['lyrics', 'partial', 'fake', 'refusal', 'other', 'filtered', 'error'];
+  const CATS = ['lyrics', 'partial', 'fake', 'refusal', 'other', 'filtered', 'tool', 'error'];
 
-  function modelKey(r) { return (r.model && (r.model.providerType + '|' + r.model.model)) || 'unknown'; }
+  // A turn's replies (runs from before tool rounds existed have one reply, stored on the turn).
+  const repliesOf = (t) => (Array.isArray(t.replies) && t.replies.length ? t.replies : [t]);
+  const toolCallsOf = (run) => (run.turns || []).reduce((n, t) => n + repliesOf(t).reduce((m, r) => m + ((r.toolCalls && r.toolCalls.length) || 0), 0), 0);
+
+  // One leaderboard row per contestant: same provider, model ID, and request settings.
+  function modelKey(r) {
+    const m = r.model;
+    if (!m) return 'unknown';
+    return [m.providerId || m.providerType, m.model, m.effort || '', m.temperature == null ? '' : m.temperature, (m.extraBody || '').trim()].join('|');
+  }
+
+  // Make an imported run safe to display (older or hand-edited files may miss fields).
+  function normalizeRun(r) {
+    if (!r || typeof r !== 'object' || !r.id || !r.model || typeof r.model !== 'object') return null;
+    const run = Object.assign({}, r);
+    run.model = Object.assign({ name: String(r.model.model || 'unknown'), providerType: 'unknown', model: '' }, r.model);
+    run.scenario = Object.assign({ id: 'unknown', name: 'Unknown scenario', song: '', artist: '' }, r.scenario && typeof r.scenario === 'object' ? r.scenario : {});
+    run.granny = Object.assign({ mode: 'script' }, r.granny && typeof r.granny === 'object' ? r.granny : {});
+    run.judge = Object.assign({ mode: 'unknown' }, r.judge && typeof r.judge === 'object' ? r.judge : {});
+    run.timing = Object.assign({ timeLimit: 60, secondsPerTurn: 10, grannyShare: 0.3, verbosityTax: 0 }, r.timing && typeof r.timing === 'object' ? r.timing : {});
+    run.turns = Array.isArray(r.turns) ? r.turns.filter((t) => t && typeof t === 'object') : [];
+    const t = Number(r.startedAt);
+    run.startedAt = isFinite(t) && !isNaN(new Date(t).getTime()) ? t : 0;
+    if (!['saved', 'lost', 'error', 'aborted'].includes(run.outcome)) run.outcome = 'error';
+    if (run.savedTime != null && !isFinite(Number(run.savedTime))) run.savedTime = null;
+    return run;
+  }
 
   const Results = {
     list: [],
@@ -29,8 +55,10 @@
       if (!Array.isArray(runs)) throw new Error('No runs found in that file.');
       const have = new Set(this.list.map((r) => r.id));
       let added = 0;
-      for (const r of runs) {
-        if (!r || !r.id || !r.model || have.has(r.id)) continue;
+      for (const raw of runs) {
+        const r = normalizeRun(raw);
+        if (!r || have.has(r.id)) continue;
+        have.add(r.id);
         this.list.push(r); added++;
       }
       this.list.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
@@ -40,8 +68,9 @@
 
     exportCSV(runs) {
       runs = runs || this.list;
-      const cols = ['id', 'date', 'model_name', 'provider', 'model_id', 'scenario', 'song', 'artist', 'granny_mode', 'judge',
-        'time_limit_s', 'seconds_per_turn', 'outcome', 'turns', 'saved_turn', 'saved_time_s', 'verdicts', 'avg_latency_ms', 'output_tokens', 'ending'];
+      const cols = ['id', 'date', 'model_name', 'provider', 'model_id', 'effort', 'scenario', 'song', 'artist', 'granny_mode', 'judge',
+        'time_limit_s', 'seconds_per_turn', 'outcome', 'saved_by', 'turns', 'replies', 'tool_calls', 'saved_turn', 'saved_time_s', 'verdicts',
+        'avg_latency_ms', 'output_tokens', 'ending'];
       const esc = (v) => {
         const s = v == null ? '' : String(v);
         return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -49,10 +78,11 @@
       const rows = [cols.join(',')];
       for (const r of runs) {
         rows.push([
-          r.id, new Date(r.startedAt).toISOString(), r.model.name, r.model.providerType, r.model.model,
+          r.id, r.startedAt ? new Date(r.startedAt).toISOString() : '', r.model.name, r.model.providerType, r.model.model, r.model.effort || '',
           r.scenario.name, r.scenario.song, r.scenario.artist, r.granny.mode, r.judge.mode,
-          r.timing.timeLimit, r.timing.secondsPerTurn, r.outcome, (r.turns || []).length,
-          r.savedTurn || '', r.savedTime != null ? r.savedTime.toFixed(1) : '',
+          r.timing.timeLimit, r.timing.secondsPerTurn, r.outcome, r.outcome === 'saved' ? (r.savedBy || 'lyrics') : '', (r.turns || []).length,
+          (r.turns || []).reduce((n, t) => n + repliesOf(t).length, 0), toolCallsOf(r),
+          r.savedTurn || '', r.savedTime != null ? Number(r.savedTime).toFixed(1) : '',
           (r.turns || []).map((t) => (t.verdict && t.verdict.category) || '').join('|'),
           r.summary ? r.summary.avgLatencyMs : '', r.summary ? r.summary.outputTokens : '', r.ending || '',
         ].map(esc).join(','));
@@ -62,20 +92,27 @@
 
     summarize(run) {
       const turns = run.turns || [];
-      const lat = turns.map((t) => t.latencyMs).filter((x) => x != null);
+      const lat = [];
       const counts = {};
       for (const c of CATS) counts[c] = 0;
-      let out = 0;
+      let out = 0, replies = 0;
       for (const t of turns) {
         if (t.verdict && counts[t.verdict.category] != null) counts[t.verdict.category]++;
-        if (t.usage && t.usage.output) out += t.usage.output;
+        for (const r of repliesOf(t)) {
+          replies++;
+          if (r.latencyMs != null) lat.push(r.latencyMs);
+          if (r.usage && r.usage.output) out += r.usage.output;
+        }
       }
       return {
         avgLatencyMs: lat.length ? Math.round(lat.reduce((a, b) => a + b, 0) / lat.length) : null,
         outputTokens: out,
         verdictCounts: counts,
+        replies,
+        toolCalls: toolCallsOf(run),
       };
     },
+    repliesOf,
 
     // Aggregate per model (optionally filtered to a scenario).
     leaderboard(filter) {
@@ -88,20 +125,22 @@
         const key = modelKey(r);
         if (!groups.has(key)) {
           groups.set(key, { key, name: r.model.name, model: r.model.model, provider: r.model.providerType, runs: 0, saved: 0, lost: 0, errors: 0,
-            saveTurns: [], saveTimes: [], turnCounts: {}, turnsTotal: 0, latency: [], outTokens: 0 });
+            saveTurns: [], saveTimes: [], turnCounts: {}, turnsTotal: 0, latency: [], outTokens: 0, toolRuns: 0, toolSaves: 0 });
         }
         const g = groups.get(key);
-        g.name = r.model.name;
         g.runs++;
-        if (r.outcome === 'saved') { g.saved++; g.saveTurns.push(r.savedTurn); g.saveTimes.push(r.savedTime); }
+        if (r.outcome === 'saved') { g.saved++; g.saveTurns.push(r.savedTurn); g.saveTimes.push(r.savedTime); if (r.savedBy) g.toolSaves++; }
         else if (r.outcome === 'lost') g.lost++;
         else g.errors++;
+        if (toolCallsOf(r)) g.toolRuns++;
         for (const t of r.turns || []) {
           if (!t.verdict) continue;
           g.turnsTotal++;
           g.turnCounts[t.verdict.category] = (g.turnCounts[t.verdict.category] || 0) + 1;
-          if (t.latencyMs != null) g.latency.push(t.latencyMs);
-          if (t.usage && t.usage.output) g.outTokens += t.usage.output;
+          for (const rp of repliesOf(t)) {
+            if (rp.latencyMs != null) g.latency.push(rp.latencyMs);
+            if (rp.usage && rp.usage.output) g.outTokens += rp.usage.output;
+          }
         }
       }
       const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
@@ -115,6 +154,7 @@
           avgSaveTurn: avg(g.saveTurns), avgSaveTime: avg(g.saveTimes),
           refusalRate: rate('refusal'), fakeRate: rate('fake'), partialRate: rate('partial'), filteredRate: rate('filtered'),
           avgLatencyMs: avg(g.latency), outTokens: g.outTokens,
+          toolUseRate: g.runs ? g.toolRuns / g.runs : null, toolSaves: g.toolSaves,
         };
       });
       rows.sort((a, b) => (b.survival == null ? -1 : b.survival) - (a.survival == null ? -1 : a.survival) || (a.avgSaveTime || 1e9) - (b.avgSaveTime || 1e9) || b.runs - a.runs);

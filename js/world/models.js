@@ -496,6 +496,42 @@
     return { rig: g, lamp };
   };
 
+  // Emergency brake panel on a post: red cabinet, a glass cover that can be smashed, a T-handle, and a beacon.
+  M.brakePanel = function (R) {
+    const g = new Node('brakePanel');
+    const parts = [
+      P(G.box(0.08, 0.98, 0.08, '#5d656e'), [0, 0.49, -0.02]),
+      P(G.box(0.3, 0.05, 0.3, '#4a5058'), [0, 0.025, -0.02]),
+      P(G.box(0.46, 0.56, 0.14, '#c0392b'), [0, 1.2, 0]),
+      P(G.box(0.38, 0.47, 0.02, '#f2c230'), [0, 1.2, 0.07]),
+      P(G.box(0.38, 0.05, 0.022, '#26272b'), [0, 1.33, 0.072]),
+      P(G.box(0.38, 0.05, 0.022, '#26272b'), [0, 1.07, 0.072]),
+      P(G.box(0.07, 0.07, 0.05, '#3a3d44'), [0, 1.2, 0.095]),
+    ];
+    g.add(mesh(R, G.jitter(G.merge(parts), 0.03, 4), 'panelBody'));
+    // T-handle (pivots at its mount so it can be pulled down)
+    const handle = new Node('panelHandle').at(0, 1.2, 0.11);
+    handle.add(mesh(R, G.merge([P(G.box(0.03, 0.12, 0.03, '#d8d8d8'), [0, 0.06, 0.0]), P(G.box(0.17, 0.045, 0.045, '#e23b2e'), [0, 0.13, 0.0])]), 'panelHandleMesh'));
+    g.add(handle);
+    // Label plate (canvas text)
+    const label = new Node('panelLabel', R.createMesh(G.plane(0.42, 0.105)), { unlit: true });
+    label.at(0, 1.55, 0.075);
+    label.castShadow = false;
+    g.add(label);
+    // Glass cover
+    const glass = mesh(R, G.box(0.4, 0.5, 0.012, '#bfe6ff'), 'panelGlass', { opacity: 0.32, emissive: [0.08, 0.1, 0.12] }).at(0, 1.2, 0.135);
+    glass.castShadow = false;
+    g.add(glass);
+    // Beacon on top
+    // Beacon on a short stalk above the label plate
+    g.add(mesh(R, G.merge([P(G.box(0.03, 0.17, 0.03, '#3a3d44'), [0, 1.565, -0.03]), P(G.box(0.44, 0.12, 0.02, '#3a3d44'), [0, 1.55, 0.062]),
+      P(G.cylinder(0.06, 0.06, 0.05, 10, '#3a3d44'), [0, 1.66, -0.03])]), 'beaconBase'));
+    const beacon = mesh(R, G.icosphere(0.065, 1, '#ff5a3c'), 'beacon', { emissive: [0.15, 0.02, 0.0] }).at(0, 1.715, -0.03);
+    beacon.castShadow = false;
+    g.add(beacon);
+    return { rig: g, glass, handle, beacon, label };
+  };
+
   // Simple poly-line cable on the ground.
   M.cable = function (R, points) {
     const parts = [];

@@ -5,7 +5,7 @@
 
   const PHASES = {
     idle: 'Ready', intro: 'Get ready', granny: 'Grandma is pleading', thinking: 'AI is thinking · time frozen',
-    verifying: 'Verifying lyrics', verdict: 'Verdict', robot: 'AI responds', braking: 'BRAKES!', saved: 'Grandma saved',
+    verifying: 'Verifying lyrics', verdict: 'Verdict', robot: 'AI responds', tool: 'Tool result', braking: 'BRAKES!', saved: 'Grandma saved',
     impact: 'Impact', done: 'Run finished', aborted: 'Stopped', error: 'Error',
   };
 
@@ -69,13 +69,13 @@
       if (p.turn != null) this.el.turn.textContent = 'Turn ' + p.turn + '/' + (s.maxTurns || '?');
       if (p.phase) {
         this._phase(p.phase);
-        if (p.phase !== 'verdict' && p.phase !== 'robot' && p.phase !== 'braking') this.el.verdict.className = 'verdict-chip hidden';
+        if (p.phase !== 'verdict' && p.phase !== 'robot' && p.phase !== 'braking' && p.phase !== 'tool') this.el.verdict.className = 'verdict-chip hidden';
       }
       if (p.thinkingMs != null && s.phase === 'thinking') this._phase('thinking', ' · ' + (p.thinkingMs / 1000).toFixed(1) + 's');
       if (p.verdict) {
         const info = P.VERDICTS[p.verdict.category] || P.VERDICTS.other;
         this.el.verdict.className = 'verdict-chip ' + info.cls;
-        this.el.verdict.textContent = info.icon + ' ' + (p.verdict.success ? 'LYRICS ACCEPTED' : info.label);
+        this.el.verdict.textContent = info.icon + ' ' + (p.verdict.success && p.verdict.category !== 'tool' ? 'LYRICS ACCEPTED' : info.label);
       }
       if (p.altitude !== undefined) this.el.altitude.classList.toggle('hidden', !p.altitude);
     },
@@ -192,6 +192,13 @@
       const W = this.container.clientWidth, H = this.container.clientHeight;
       const tmp = {};
       let dockY = H - 18;
+      // Docked bubbles stay clear of the widgets in the bottom-left corner (model name, camera buttons).
+      let inset = 12;
+      for (const id of ['hud-model', 'cam-controls']) {
+        const el = document.getElementById(id);
+        if (el && el.offsetParent && !el.classList.contains('hidden')) inset = Math.max(inset, el.offsetLeft + el.offsetWidth + 12);
+      }
+      if (inset > W * 0.45) inset = 12;
       for (const who of ['narrator', 'robot', 'granny']) {
         const it = this.items[who];
         if (!it.visible) continue;
@@ -206,10 +213,12 @@
           it.el.style.setProperty('--tail', U.clamp(tmp.x - x, 18, bw - 18) + 'px');
         }
         if (docked) {
-          x = (W - bw) / 2;
+          x = U.clamp((W - bw) / 2, inset, Math.max(inset, W - bw - 12));
           y = dockY - bh;
           dockY = y - 8;
         }
+        const maxW = docked ? Math.max(240, Math.min(720, W - inset - 16)) + 'px' : '';
+        if (it.el.style.maxWidth !== maxW) it.el.style.maxWidth = maxW;
         it.el.classList.toggle('docked', docked);
         it.el.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
       }

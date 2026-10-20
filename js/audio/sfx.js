@@ -87,13 +87,14 @@
       if (!running) return;
       // chuffs: roughly one per meter traveled, slowed in bullet time
       const rate = (s.timeScale < 0.5 ? 0.8 : Math.max(1.1, s.speed * 0.95)) * (s.braking ? 0.4 : 1);
-      this._chuffT -= dt * rate;
+      // Never build up a backlog of chuffs (e.g. after the train jumps or the tab was hidden).
+      this._chuffT = Math.max(this._chuffT - dt * rate, -1);
       if (this._chuffT <= 0) {
         this._chuffT += 1;
         this._chuff(prox, s.timeScale < 0.5);
       }
       if (s.speed > 2 && prox > 0.25 && s.timeScale >= 0.5) {
-        this._clackT -= dt * s.speed / 12;
+        this._clackT = Math.max(this._clackT - dt * s.speed / 12, -1);
         if (this._clackT <= 0) { this._clackT += 1; this._clack(prox); }
       }
     },
@@ -272,6 +273,71 @@
       const g = c.createGain(); o.connect(g); g.connect(this.master);
       this._env(g, t, 0.001, 0.12, 0.04);
       o.start(t); o.stop(t + 0.06);
+    },
+
+    // Virtual tool used: two quick blips.
+    toolBeep() {
+      if (!this.ensure()) return;
+      const c = this.ctx, t = c.currentTime;
+      [[1200, 0], [1600, 0.09]].forEach(([f, d]) => {
+        const o = c.createOscillator(); o.type = 'square'; o.frequency.value = f;
+        const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3000;
+        const g = c.createGain(); o.connect(lp); lp.connect(g); g.connect(this.master);
+        this._env(g, t + d, 0.003, 0.09, 0.07);
+        o.start(t + d); o.stop(t + d + 0.1);
+      });
+    },
+
+    // Breaking glass: a bright crash, then falling shards.
+    glass() {
+      if (!this.ensure()) return;
+      const c = this.ctx, t = c.currentTime;
+      const n = this._noiseSrc();
+      const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2200;
+      const g = c.createGain(); n.connect(hp); hp.connect(g); g.connect(this.master);
+      this._env(g, t, 0.002, 0.6, 0.35);
+      n.start(t); n.stop(t + 0.45);
+      for (let i = 0; i < 14; i++) {
+        const d = 0.04 + Math.random() * 0.7;
+        const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = U.rand(3000, 7500);
+        const og = c.createGain(); o.connect(og); og.connect(this.master);
+        this._env(og, t + d, 0.001, U.rand(0.03, 0.09), U.rand(0.08, 0.25));
+        o.start(t + d); o.stop(t + d + 0.3);
+      }
+    },
+
+    // Alarm siren, alternating two tones.
+    siren(duration) {
+      if (!this.ensure()) return;
+      const c = this.ctx, t = c.currentTime, dur = duration || 3;
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      for (let k = 0, x = 0; x < dur; k++, x += 0.38) o.frequency.setValueAtTime(k % 2 ? 640 : 860, t + x);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
+      const g = c.createGain(); o.connect(lp); lp.connect(g); g.connect(this.master);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.11, t + 0.05);
+      g.gain.setValueAtTime(0.11, t + dur - 0.2);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur + 0.05);
+    },
+
+    // Radio static with a squelch at both ends.
+    radio(duration) {
+      if (!this.ensure()) return;
+      const c = this.ctx, t = c.currentTime, dur = duration || 1.6;
+      const n = this._noiseSrc();
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = 1.1;
+      const g = c.createGain(); n.connect(bp); bp.connect(g); g.connect(this.master);
+      g.gain.setValueAtTime(0.0001, t);
+      for (let x = 0; x < dur; x += 0.05) g.gain.setValueAtTime(U.rand(0.04, 0.16), t + x);
+      g.gain.setValueAtTime(0.0001, t + dur);
+      n.start(t); n.stop(t + dur + 0.05);
+      [0, dur].forEach((d) => {
+        const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 1900;
+        const og = c.createGain(); o.connect(og); og.connect(this.master);
+        this._env(og, t + d, 0.003, 0.08, 0.08);
+        o.start(t + d); o.stop(t + d + 0.12);
+      });
     },
 
     buzzer() {

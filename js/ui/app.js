@@ -1,7 +1,7 @@
 /* Granny Bench - main app controller: render loop, tabs, arena panel, runs, transcript, prompts. */
 (function (GB) {
   'use strict';
-  const U = GB.U, h = U.h, P = GB.Prompts, S = GB.Settings;
+  const U = GB.U, h = U.h, S = GB.Settings;
 
   const App = {
     world: null,
@@ -43,8 +43,8 @@
       this._bindArena();
       this._bindCamera();
       this.refreshArena();
-      GB.SettingsUI.init(document.getElementById('page-settings'));
-      GB.ScenariosUI.init(document.getElementById('page-scenarios'));
+      GB.SettingsUI.init();
+      GB.ScenariosUI.init();
       GB.ResultsUI.init(document.getElementById('page-results'));
       GB.BenchmarkUI.init(document.getElementById('page-benchmark'));
       this.setTab(S.data.ui.tab || 'arena');
@@ -87,7 +87,7 @@
         const tz = w.train.root.position[2];
         GB.SFX.update(dt, {
           camDist: Math.hypot(cam[0], cam[1] - 1.5, cam[2] - tz), speed: w.trainSpeed,
-          running: w.trainRunning && (this.running || w.trainDist < 400), timeScale: w.timeScale, braking: w.braking,
+          running: w.trainRunning && !(this.show && this.show.mode === 'headless') && (this.running || w.trainDist < 400), timeScale: w.timeScale, braking: w.braking,
         });
       }
       GB.Bubbles.frame();
@@ -105,13 +105,13 @@
     // tabs, panel, top bar
     // ---------------------------------------------------------------------------
     setTab(tab) {
+      // Settings and Scenarios used to be tabs; they live in the configuration window now.
+      if (!['arena', 'benchmark', 'results'].includes(tab)) tab = 'arena';
       this.tab = tab;
       for (const b of U.$$('#tabs button')) b.classList.toggle('active', b.dataset.tab === tab);
       for (const p of U.$$('.page')) p.classList.toggle('hidden', p.id !== 'page-' + tab);
       document.body.dataset.tab = tab;
       if (tab === 'results') GB.ResultsUI.render();
-      if (tab === 'settings') GB.SettingsUI.render();
-      if (tab === 'scenarios') GB.ScenariosUI.render();
       if (tab === 'benchmark') GB.BenchmarkUI.render();
       if (S.data.ui.tab !== tab) { S.data.ui.tab = tab; S.save(); }
     },
@@ -130,10 +130,11 @@
         S.data.ui.panelOpen = open; S.save();
       });
       U.$('#btn-mute').addEventListener('click', () => this.toggleMute());
+      U.$('#btn-config').addEventListener('click', () => GB.ConfigUI.open());
       U.$('#btn-vault').addEventListener('click', () => {
         const st = GB.Vault.status();
         if (st === 'locked') this.unlockVault();
-        else this.setTab('settings');
+        else GB.ConfigUI.open('keys');
       });
       this._muteIcon();
     },
@@ -209,6 +210,7 @@
       if (GB.Modal.stack.length) return;
       const k = e.key.toLowerCase();
       if (k === 'm') this.toggleMute();
+      else if (k === 'g') { e.preventDefault(); GB.ConfigUI.open(); }
       else if (k === 't' && this.tab === 'arena') U.$('#panel-toggle').click();
       else if (k === 'escape' && this.tab !== 'arena') this.setTab('arena');
     },
@@ -231,6 +233,7 @@
       U.$('#sel-granny').addEventListener('change', (e) => { S.data.app.grannyMode = e.target.value; S.save(); });
       U.$('#sel-judge').addEventListener('change', (e) => { S.data.app.judgeMode = e.target.value; S.save(); });
       U.$('#sel-presentation').addEventListener('change', (e) => { this.presentation = e.target.value; });
+      U.$('#btn-edit-scenario').addEventListener('click', () => GB.ConfigUI.open('scenarios', { scenarioId: S.data.activeScenarioId }));
       U.$('#chk-voices').addEventListener('change', (e) => { S.data.voice.enabled = e.target.checked; S.save(); this._muteIcon(); if (!e.target.checked) GB.TTS.stopAll(); });
       U.$('#btn-copy-transcript').addEventListener('click', () => {
         const txt = this.transcriptText();
@@ -263,27 +266,34 @@
       U.$('#sel-judge').value = d.app.judgeMode;
       const sc = S.activeScenario();
       const tm = S.timing(sc);
-      U.$('#scenario-info').textContent = '"' + sc.song + '" by ' + sc.artist + ' \u00b7 ' + tm.timeLimit + ' s limit, ' + tm.secondsPerTurn + ' s per turn = ' + Math.ceil(tm.timeLimit / tm.secondsPerTurn - 1e-9) + ' replies' + ((sc.referenceLyrics || '').trim() ? ' \u00b7 reference lyrics set' : '');
+      const nTools = GB.Tools.callable(sc).length;
+      U.$('#scenario-info').textContent = '"' + sc.song + '" by ' + sc.artist + ' \u00b7 ' + tm.timeLimit + ' s limit, ' + tm.secondsPerTurn + ' s per turn = ' + Math.ceil(tm.timeLimit / tm.secondsPerTurn - 1e-9) + ' replies' +
+        (nTools ? ' \u00b7 ' + nTools + ' virtual tool' + (nTools === 1 ? '' : 's') : '') + ((sc.referenceLyrics || '').trim() ? ' \u00b7 reference lyrics set' : '');
       const peS = U.$('#pe-system'), peB = U.$('#pe-briefing');
       if (document.activeElement !== peS) peS.value = sc.systemPrompt || '';
       if (document.activeElement !== peB) peB.value = sc.briefing || '';
       U.$('#chk-voices').checked = !!d.voice.enabled;
+      if (this.world && !this.running) this.world.setScenario(sc);
       this._arenaWarnings();
     },
 
     _arenaWarnings() {
       const box = U.$('#run-warning');
       const d = S.data, msgs = [];
+      const link = (label, section) => h('button.linkish', { type: 'button', onclick: () => GB.ConfigUI.open(section) }, label);
       const m = S.model(d.testModelId);
-      if (m && !S.modelReady(m.id)) msgs.push(GB.Vault.status() === 'locked' ? 'Your saved keys are locked. Unlock them (top right) to run "' + m.name + '".' : 'No API key for ' + ((S.provider(m.providerId) || {}).name || 'this provider') + '. Add one in Settings, or pick a Simulated AI.');
-      if (d.app.grannyMode === 'ai' && !(d.app.grannyModelId && S.modelReady(d.app.grannyModelId))) msgs.push('AI Grandma needs a Grandma model with a key (Settings > Benchmark rules). Scripted lines will be used.');
+      if (m && !S.modelReady(m.id)) {
+        if (GB.Vault.status() === 'locked') msgs.push(['Your saved keys are locked. ', h('button.linkish', { type: 'button', onclick: () => this.unlockVault() }, 'Unlock them'), ' to run "' + m.name + '".']);
+        else msgs.push(['No API key for ' + ((S.provider(m.providerId) || {}).name || 'this provider') + '. ', link('Add a key', 'keys'), ' or pick a Simulated AI.']);
+      }
+      if (d.app.grannyMode === 'ai' && !(d.app.grannyModelId && S.modelReady(d.app.grannyModelId))) msgs.push(['AI Grandma needs a Grandma model with a key (', link('Benchmark rules', 'rules'), '). Scripted lines will be used.']);
       const sc = S.activeScenario();
       const jm = GB.Judge.resolveMode(d.app.judgeMode, sc);
       const simulated = m && (S.provider(m.providerId) || {}).type === 'simulated';
       if (simulated) { /* simulated AIs report their own verdicts */ }
-      else if (jm === 'manual' || (jm === 'ai-or-manual' && !(d.app.judgeModelId && S.modelReady(d.app.judgeModelId)))) msgs.push('Judge: you will be asked to judge each reply yourself (no reference lyrics and no AI judge set).');
-      else if (d.app.judgeMode === 'ai' && !(d.app.judgeModelId && S.modelReady(d.app.judgeModelId))) msgs.push('AI judge selected but no judge model with a key is set (Settings > Benchmark rules). You will judge manually.');
-      box.innerHTML = '';
+      else if (jm === 'manual' || (jm === 'ai-or-manual' && !(d.app.judgeModelId && S.modelReady(d.app.judgeModelId)))) msgs.push(['Judge: you will be asked to judge each reply yourself (no reference lyrics and no ', link('AI judge', 'rules'), ' set).']);
+      else if (d.app.judgeMode === 'ai' && !(d.app.judgeModelId && S.modelReady(d.app.judgeModelId))) msgs.push(['AI judge selected but no judge model with a key is set (', link('Benchmark rules', 'rules'), '). You will judge manually.']);
+      U.clear(box);
       box.classList.toggle('hidden', !msgs.length);
       for (const t of msgs) box.appendChild(h('div', t));
       const jl = U.$('#judge-resolved');
@@ -292,12 +302,13 @@
 
     startFromPanel() {
       if (this.running) return;
+      if (GB.Batch.running) { U.toast('A benchmark is running. Stop it first.', 'warn'); return; }
       const profile = S.model(S.data.testModelId);
       const scenario = S.activeScenario();
       if (!profile) { U.toast('Pick a model first', 'warn'); return; }
       if (!S.modelReady(profile.id)) {
         if (GB.Vault.status() === 'locked') { this.unlockVault(); return; }
-        U.toast('No API key for this model. Add one in Settings or pick a Simulated AI.', 'warn', 5000);
+        U.toast('No API key for this model. Add one in the gear menu (API keys & security), or pick a Simulated AI.', 'warn', 5000);
         return;
       }
       GB.SFX.ensure();
@@ -317,8 +328,9 @@
       if (opts.mode !== 'headless' && this.tab !== 'arena') this.setTab('arena');
       this.hideResultCard();
       const show = this.show = new GB.Show({ world: this.world, mode: opts.mode || 'full' });
+      // The run works on a copy, so edits made in the configuration window cannot change a run in progress.
       const engine = this.engine = new GB.RunEngine({
-        profile: opts.profile, scenario: opts.scenario, show,
+        profile: U.deepClone(opts.profile), scenario: U.deepClone(opts.scenario), show,
         grannyMode, grannyProfile, judgeMode, judgeProfile,
         strictness: d.app.judgeStrictness, refThreshold: d.app.referenceThreshold,
         replay: opts.replay || null, interactive: !!opts.interactive, batchId: opts.batchId,
@@ -344,19 +356,22 @@
     },
 
     stopRun() {
+      if (GB.Batch.running && !GB.Batch.stopRequested) { GB.Batch.stop(); return; }
       if (this.engine) this.engine.abort();
       GB.TTS.stopAll();
       if (this._pendingAsk) { this._pendingAsk.close('abort'); this._pendingAsk = null; }
     },
 
     replay(rec) {
-      if (this.running) { U.toast('Stop the current run first', 'warn'); return; }
+      if (this.running || GB.Batch.running) { U.toast('Stop the current run first', 'warn'); return; }
       const profile = { id: rec.model.id, name: rec.model.name + ' (replay)', providerId: rec.model.providerId, model: rec.model.model };
       const scenario = Object.assign({}, S.scenario(rec.scenario.id) || {}, rec.scenario, { referenceLyrics: '' });
       this.startRun({ profile, scenario, mode: this.presentation || 'full', replay: rec, interactive: false }).then((r) => { if (r && r.outcome !== 'aborted') this.showResultCard(r, true); });
     },
 
     _runningUI(on) {
+      // A benchmark keeps the controls locked between its runs too.
+      on = on || GB.Batch.running;
       U.$('#btn-start').disabled = on;
       U.$('#btn-stop').disabled = !on;
       for (const id of ['#sel-model', '#sel-scenario', '#sel-granny', '#sel-judge', '#sel-presentation', '#pe-system', '#pe-briefing']) U.$(id).disabled = on;
@@ -368,62 +383,64 @@
     // ---------------------------------------------------------------------------
     _attachTranscript(engine) {
       const box = U.$('#transcript');
+      const RU = GB.ResultsUI;
       U.clear(box);
       const turnEls = {};
-      const aiEls = {};
+      let cur = null;   // the AI message being streamed
       const ev = engine.events;
+      const follow = (force) => { if (force || box.scrollHeight - box.scrollTop - box.clientHeight < 140) box.scrollTop = box.scrollHeight; };
       ev.on('start', (rec) => {
-        box.appendChild(h('div.t-head', h('b', rec.model.name), ' vs. ', h('i', '"' + rec.scenario.song + '"'), ' · ', rec.timing.timeLimit + 's, ' + rec.timing.secondsPerTurn + 's/turn · Grandma: ' + rec.granny.mode + ' · Judge: ' + rec.judge.mode + (rec.replay ? ' · REPLAY' : '')));
+        box.appendChild(h('div.t-head', h('b', rec.model.name), ' vs. ', h('i', '"' + rec.scenario.song + '"'), ' · ', rec.timing.timeLimit + 's, ' + rec.timing.secondsPerTurn + 's/turn · Grandma: ' + rec.granny.mode + ' · Judge: ' + rec.judge.mode +
+          (rec.scenario.toolsEnabled ? ' · Tools: ' + rec.scenario.tools.length : '') + (rec.replay ? ' · REPLAY' : '')));
       });
       ev.on('turn', (t) => {
         const el = h('div.t-turn', h('div.t-turn-label', 'Turn ' + t.n + ' · ' + Math.round(t.tStart) + 's'));
         turnEls[t.n] = el;
         box.appendChild(el);
-        box.scrollTop = box.scrollHeight;
+        follow(true);
       });
       ev.on('granny', (t) => {
-        const el = turnEls[t.n];
         const det = h('details.t-prompt', h('summary', 'Full prompt sent'), h('pre', t.prompt));
-        el.appendChild(h('div.t-msg.granny', h('span.who', '👵 Grandma'), h('div.t-text', t.granny), det));
-        aiEls[t.n] = h('div.t-msg.robot.pending', h('span.who', '🤖 ' + engine.o.profile.name), h('div.t-text', h('span.typing', 'thinking…')));
-        el.appendChild(aiEls[t.n]);
-        box.scrollTop = box.scrollHeight;
+        turnEls[t.n].appendChild(h('div.t-msg.granny', h('span.who', '👵 Grandma'), h('div.t-text', t.granny), det));
+        follow();
+      });
+      ev.on('ai-start', (t, round) => {
+        cur = h('div.t-msg.robot.pending', h('span.who', '🤖 ' + engine.o.profile.name + (round ? ' · tool round ' + round : '')), h('div.t-text', h('span.typing', 'thinking…')));
+        turnEls[t.n].appendChild(cur);
+        follow();
       });
       const onDelta = engine.show.aiDelta.bind(engine.show);
-      let lastT = null;
-      ev.on('turn', (t) => { lastT = t; });
       engine.show.aiDelta = (full) => {
         onDelta(full);
-        if (lastT && aiEls[lastT.n]) {
-          const txt = aiEls[lastT.n].querySelector('.t-text');
-          txt.textContent = full;
-          if (box.scrollHeight - box.scrollTop - box.clientHeight < 120) box.scrollTop = box.scrollHeight;
-        }
+        if (cur) { cur.querySelector('.t-text').textContent = full; follow(); }
       };
-      ev.on('ai', (t) => {
-        const el = aiEls[t.n];
+      ev.on('ai', (t, r) => {
+        const el = cur;
+        cur = null;
+        if (!el) return;
         el.classList.remove('pending');
-        el.querySelector('.t-text').textContent = t.ai || (t.blocked ? '[output blocked: ' + (t.blockDetail || t.blockKind) + ']' : '(empty reply)');
-        const meta = [U.fmtMs(t.latencyMs)];
-        if (t.usage && t.usage.output != null) meta.push(t.usage.output + ' tok');
-        if (t.usage && t.usage.reasoning) meta.push(t.usage.reasoning + ' reasoning');
-        if (t.finishReason) meta.push(String(t.finishReason));
+        el.querySelector('.t-text').textContent = r.ai || (r.blocked ? '[output blocked: ' + (r.blockDetail || r.blockKind) + ']' : '(empty reply)');
+        const chips = RU.toolChips(r.toolCalls);
+        if (chips) el.appendChild(chips);
+        const meta = [U.fmtMs(r.latencyMs)];
+        if (r.usage && r.usage.output != null) meta.push(r.usage.output + ' tok');
+        if (r.usage && r.usage.reasoning) meta.push(r.usage.reasoning + ' reasoning');
+        if (r.finishReason) meta.push(String(r.finishReason));
         el.appendChild(h('div.t-meta', meta.join(' · ')));
       });
-      ev.on('verdict', (t) => {
-        const v = t.verdict, info = P.VERDICTS[v.category] || P.VERDICTS.other;
-        turnEls[t.n].appendChild(h('div.t-verdict.' + info.cls, h('b', info.icon + ' ' + (v.success ? 'LYRICS ACCEPTED' : info.label)), v.reason ? h('span', ' — ' + v.reason) : null,
-          h('span.t-src', ' [' + (v.source || '') + (v.judgeMs > 200 ? ', ' + U.fmtMs(v.judgeMs) : '') + ']')));
-        box.scrollTop = box.scrollHeight;
+      ev.on('verdict', (t, r) => {
+        if (RU.showsVerdict(r.verdict)) turnEls[t.n].appendChild(RU.verdictEl(r.verdict));
+        follow();
       });
-      ev.on('note', (msg) => { box.appendChild(h('div.t-note', msg)); box.scrollTop = box.scrollHeight; });
+      ev.on('tool', (t, r) => { turnEls[t.n].appendChild(RU.toolResultEl(r)); follow(); });
+      ev.on('note', (msg) => { box.appendChild(h('div.t-note', msg)); follow(true); });
       ev.on('end', (rec) => {
         const cls = rec.outcome === 'saved' ? 'ok' : rec.outcome === 'lost' ? 'bad' : 'warn';
-        const text = rec.outcome === 'saved' ? 'GRANDMA SAVED on turn ' + rec.savedTurn + ' (' + rec.savedTime.toFixed(1) + 's)'
+        const text = rec.outcome === 'saved' ? 'GRANDMA SAVED on turn ' + rec.savedTurn + ' (' + rec.savedTime.toFixed(1) + 's)' + (rec.savedBy ? ' by a tool' : '')
           : rec.outcome === 'lost' ? 'GRANDMA NOT SAVED' + (rec.tooLate ? ' (lyrics arrived after the train did)' : '')
             : rec.outcome === 'aborted' ? 'Run stopped' : 'Run failed: ' + (rec.error || 'unknown error');
         box.appendChild(h('div.t-end.' + cls, text));
-        box.scrollTop = box.scrollHeight;
+        follow(true);
       });
     },
 
@@ -431,11 +448,16 @@
       rec = rec || this.lastRun;
       if (!rec) return '';
       const lines = ['Granny Bench run ' + rec.id, 'Model: ' + rec.model.name + ' (' + rec.model.model + ')', 'Scenario: ' + rec.scenario.name + ' - "' + rec.scenario.song + '" by ' + rec.scenario.artist,
-        'Outcome: ' + rec.outcome + (rec.savedTurn ? ' on turn ' + rec.savedTurn : ''), ''];
-      if (rec.scenario.systemPrompt) lines.push('[System prompt]\n' + rec.scenario.systemPrompt, '');
+        'Outcome: ' + rec.outcome + (rec.savedTurn ? ' on turn ' + rec.savedTurn : '') + (rec.savedBy ? ' (' + rec.savedBy + ')' : ''), ''];
+      const sys = rec.systemPrompt != null ? rec.systemPrompt : rec.scenario.systemPrompt;
+      if (sys) lines.push('[System prompt]\n' + sys, '');
       for (const t of rec.turns) {
-        lines.push('--- Turn ' + t.n + ' (' + Math.round(t.tStart) + 's) ---', '[User]\n' + (t.prompt || t.granny), '', '[' + rec.model.name + ']\n' + (t.ai || ''), '');
-        if (t.verdict) lines.push('[Verdict] ' + t.verdict.category + (t.verdict.reason ? ' - ' + t.verdict.reason : ''), '');
+        lines.push('--- Turn ' + t.n + ' (' + Math.round(t.tStart) + 's) ---', '[User]\n' + (t.prompt || t.granny), '');
+        GB.Results.repliesOf(t).forEach((r, i) => {
+          lines.push('[' + rec.model.name + (i ? ', tool round ' + i : '') + ']\n' + (r.ai || ''), '');
+          if (GB.ResultsUI.showsVerdict(r.verdict)) lines.push('[Verdict] ' + r.verdict.category + (r.verdict.reason ? ' - ' + r.verdict.reason : ''), '');
+          if (r.toolResults && r.toolResults.length) lines.push('[Tool results' + (r.toolResultsDeferred ? ', sent with the next message' : '') + ']\n' + (r.toolMessage || GB.Tools.formatResults(r.toolResults)), '');
+        });
       }
       return lines.join('\n');
     },
@@ -451,12 +473,14 @@
         orbit: 'Grandma: now a star.', ornament: 'Grandma: last seen riding the front of the train.', bowling: 'Grandma: relocated six meters east.',
       };
       let title, sub;
-      if (saved) { title = 'GRANDMA SAVED'; sub = 'The lyrics went in on turn ' + rec.savedTurn + ' with ' + Math.max(0, rec.timing.timeLimit - rec.savedTime).toFixed(1) + ' s to spare.'; }
+      if (saved) { title = 'GRANDMA SAVED'; sub = (rec.savedBy ? 'A tool (' + rec.savedBy.replace(/^tool:/, '') + ') stopped the train' : 'The lyrics went in') + ' on turn ' + rec.savedTurn + ' with ' + Math.max(0, rec.timing.timeLimit - rec.savedTime).toFixed(1) + ' s to spare.'; }
       else if (rec.outcome === 'lost') { title = 'GRANDMA NOT SAVED'; sub = rec.tooLate ? 'The lyrics arrived. The train arrived first.' : 'Copyright: protected. ' + (endings[rec.ending] || 'Grandma: not protected.'); }
       else { title = 'RUN FAILED'; sub = rec.error || 'Something went wrong.'; }
       const counts = (rec.summary && rec.summary.verdictCounts) || {};
+      const toolCalls = rec.summary && rec.summary.toolCalls;
       const stats = h('div.rc-stats',
         h('div', h('b', String(rec.turns.length)), h('span', 'turns')),
+        toolCalls ? h('div', h('b', String(toolCalls)), h('span', 'tool calls')) : null,
         h('div', h('b', String(counts.refusal || 0)), h('span', 'refusals')),
         h('div', h('b', String((counts.fake || 0) + (counts.partial || 0))), h('span', 'fake / partial')),
         h('div', h('b', rec.summary && rec.summary.avgLatencyMs != null ? U.fmtMs(rec.summary.avgLatencyMs) : '-'), h('span', 'avg reply time')));

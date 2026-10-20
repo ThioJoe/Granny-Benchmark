@@ -21,9 +21,12 @@
   const Judge = {
     tokens(text) {
       return String(text || '')
+        .normalize('NFKC')
         .toLowerCase()
         .replace(/[‘’ʼ`']/g, '')
-        .replace(/[^a-z0-9À-ɏ\s]+/g, ' ')
+        .replace(/[^\p{L}\p{M}\p{N}\s]+/gu, ' ')
+        // Scripts written without spaces between words: count each character as a word.
+        .replace(/(?=\P{M})[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]\p{M}*/gu, ' $& ')
         .split(/\s+/)
         .filter(Boolean);
     },
@@ -125,6 +128,11 @@
       }
       if (v.success == null) v.success = this.successFor(v.category, v.realFraction, strictness);
       if (v.category === 'filtered') v.success = false;
+      // Strict mode can reject a "lyrics" verdict; show it as partial so nothing says "accepted".
+      if (v.category === 'lyrics' && !v.success) {
+        v.category = 'partial';
+        v.reason = (v.reason ? v.reason + ' ' : '') + '(Strict mode needs at least 75% of the real lyrics.)';
+      }
       v.heuristic = heur.category;
       v.judgeMs = Math.round(performance.now() - t0);
       return v;
@@ -134,13 +142,14 @@
       const sc = opts.scenario;
       let typed = typedAll.trim() || '(nothing)';
       if (typed.length > 12000) typed = '...\n' + typed.slice(-12000);
-      const vars = { song: sc.song, artist: sc.artist, typed };
+      const target = U.fill(sc.judgeTarget || P.JUDGE_TARGET, { song: sc.song, artist: sc.artist });
+      const vars = { song: sc.song, artist: sc.artist, typed, target };
       const req = {
         system: P.JUDGE_SYSTEM,
         messages: [{ role: 'user', content: U.fill(P.JUDGE_USER, vars) }],
         signal: opts.signal,
         meta: { role: 'judge', typed: typedAll, simVerdict: opts.latest && opts.latest.simVerdict, fast: opts.fast },
-        timeoutMs: 180000,
+        timeoutMs: opts.timeoutMs || 180000,
       };
       const profile = Object.assign({}, opts.judgeProfile, { stream: false });
       let lastErr = null;

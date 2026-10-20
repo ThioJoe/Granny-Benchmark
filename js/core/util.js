@@ -5,7 +5,7 @@
 
   const U = {};
 
-  U.APP_VERSION = '1.0.0';
+  U.APP_VERSION = '1.1.0';
 
   // ---------- numbers ----------
   U.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);

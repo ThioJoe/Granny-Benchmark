@@ -105,6 +105,7 @@
       if (!cryptoOk) throw new Error('Web Crypto is not available in this browser context.');
       if (!passphrase || passphrase.length < 4) throw new Error('Use a passphrase of at least 4 characters.');
       this._salt = crypto.getRandomValues(new Uint8Array(16));
+      this._iter = ITERATIONS;
       this._key = await deriveKey(passphrase, this._salt, ITERATIONS);
       await this._persist();
       this.events.emit('change');
@@ -114,7 +115,8 @@
       const blob = Store.get(VAULT_KEY, null);
       if (!blob) throw new Error('No saved vault.');
       const salt = b64.to(blob.salt);
-      const key = await deriveKey(passphrase, salt, blob.iter || ITERATIONS);
+      const iter = Number(blob.iter) || ITERATIONS;
+      const key = await deriveKey(passphrase, salt, iter);
       let plain;
       try {
         plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64.to(blob.iv) }, key, b64.to(blob.ct));
@@ -124,6 +126,7 @@
       const data = JSON.parse(dec.decode(plain));
       this._key = key;
       this._salt = salt;
+      this._iter = iter;
       this._secrets = (data && data.keys) || {};
       this.events.emit('change');
     },
@@ -154,7 +157,7 @@
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this._key,
         enc.encode(JSON.stringify({ keys: this._secrets, savedAt: Date.now() })));
-      Store.set(VAULT_KEY, { v: 1, kdf: 'PBKDF2-SHA256', iter: ITERATIONS, salt: b64.from(this._salt), iv: b64.from(iv), ct: b64.from(ct) });
+      Store.set(VAULT_KEY, { v: 1, kdf: 'PBKDF2-SHA256', iter: this._iter || ITERATIONS, salt: b64.from(this._salt), iv: b64.from(iv), ct: b64.from(ct) });
     },
 
     // Read a key: session keys (config file / memory-only) win over vault keys.

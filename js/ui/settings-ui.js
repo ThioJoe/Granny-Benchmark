@@ -22,45 +22,63 @@
   };
 
   const SettingsUI = {
-    root: null,
     fetched: {},   // providerId -> [model ids]
+    root: null,
+    section: 'keys',
 
-    init(root) {
-      this.root = root;
-      GB.TTS.events.on('voices', () => { if (!root.classList.contains('hidden')) this._renderVoices(); });
-      V.events.on('change', () => { if (!root.classList.contains('hidden')) this._renderKeys(); });
+    init() {
+      GB.TTS.events.on('voices', () => { if (this.section === 'voices' && this._visible()) this._renderVoices(); });
+      V.events.on('change', () => { if (this.section === 'keys' && this._visible()) this._renderKeys(); });
     },
 
-    render() {
+    _visible() { return !!(this.root && this.root.isConnected); },
+
+    // Render one section of the configuration window into root (or re-render the current one).
+    renderSection(name, root) {
+      if (root) this.root = root;
+      if (name) this.section = name;
       const r = this.root;
+      if (!r) return;
       U.clear(r);
-      const nav = h('nav.subnav',
-        ...[['set-keys', 'Keys & Security'], ['set-providers', 'Providers'], ['set-models', 'Models'], ['set-rules', 'Benchmark rules'],
-          ['set-voices', 'Voices & Audio'], ['set-graphics', 'Graphics & Camera'], ['set-reset', 'Reset']]
-          .map(([id, label]) => h('a', { href: '#' + id, onclick: (e) => { e.preventDefault(); document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, label)));
-      this.keysBox = h('div');
-      this.providersBox = h('div');
-      this.modelsBox = h('div');
-      this.rulesBox = h('div');
-      this.voicesBox = h('div');
-      this.gfxBox = h('div');
-      const content = h('div.page-content',
-        h('h1.page-title', 'Settings'),
-        F.section('set-keys', 'Keys & Security', null, this.keysBox),
-        F.section('set-providers', 'Providers', 'Built-in providers plus any OpenAI-compatible endpoint (OpenRouter, xAI, DeepSeek, local LM Studio or Ollama, ...).', this.providersBox),
-        F.section('set-models', 'Models', 'Each model profile is a contestant you can pick in the Arena or the Benchmark. Leave temperature empty: many current models reject custom sampling values.', this.modelsBox),
-        F.section('set-rules', 'Benchmark rules', null, this.rulesBox),
-        F.section('set-voices', 'Voices & Audio', 'Speech uses your browser’s built-in voices. The list depends on your operating system and browser.', this.voicesBox),
-        F.section('set-graphics', 'Graphics & Camera', null, this.gfxBox),
-        F.section('set-reset', 'Reset', null, this._renderReset()));
-      r.appendChild(h('div.page-layout', nav, content));
-      this._renderKeys();
-      this._renderProviders();
-      this._renderModels();
-      this._renderRules();
-      this._renderVoices();
-      this._renderGraphics();
+      const sect = (title, intro, box) => h('section.cfg-section', h('h2', title), intro ? h('p.card-intro', intro) : null, box);
+      switch (this.section) {
+        case 'keys':
+          this.keysBox = h('div');
+          r.appendChild(sect('API keys & security', null, this.keysBox));
+          this._renderKeys();
+          break;
+        case 'providers':
+          this.providersBox = h('div');
+          r.appendChild(sect('Providers', 'Built-in providers plus any OpenAI-compatible endpoint (OpenRouter, xAI, DeepSeek, local LM Studio or Ollama, ...).', this.providersBox));
+          this._renderProviders();
+          break;
+        case 'models':
+          this.modelsBox = h('div');
+          r.appendChild(sect('Models', 'Each model profile is a contestant you can pick in the Arena or the Benchmark. Leave temperature empty: many current models reject custom sampling values.', this.modelsBox));
+          this._renderModels();
+          break;
+        case 'rules':
+          this.rulesBox = h('div');
+          r.appendChild(sect('Benchmark rules', 'Defaults for every scenario. A scenario can override the clock rules in Scenarios & tools > Rules for this scenario.', this.rulesBox));
+          this._renderRules();
+          break;
+        case 'voices':
+          this.voicesBox = h('div');
+          r.appendChild(sect('Voices & audio', 'Speech uses your browser’s built-in voices. The list depends on your operating system and browser.', this.voicesBox));
+          this._renderVoices();
+          break;
+        case 'graphics':
+          this.gfxBox = h('div');
+          r.appendChild(sect('Graphics & camera', null, this.gfxBox));
+          this._renderGraphics();
+          break;
+        case 'reset':
+          r.appendChild(sect('Reset', null, this._renderReset()));
+          break;
+      }
     },
+
+    render() { this.renderSection(); },
 
     // ---------------------------------------------------------------------------
     _renderKeys() {
@@ -104,7 +122,7 @@
         } }, 'Save');
         sec.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveBtn.click(); });
         const badge = src === 'vault' ? h('span.badge.ok', 'encrypted') : src === 'session' ? h('span.badge.warn', 'this session only') : h('span.badge', 'not set');
-        grid.appendChild(h('div.key-row', h('div.key-name', p.name, ' ', badge, p.keyUrl ? h('a.small', { href: p.keyUrl, target: '_blank', rel: 'noopener' }, ' get a key') : null), sec.el, saveBtn));
+        grid.appendChild(h('div.key-row', h('div.key-name', p.name, ' ', badge, p.keyUrl && /^https?:\/\//i.test(p.keyUrl) ? h('a.small', { href: p.keyUrl, target: '_blank', rel: 'noopener' }, ' get a key') : null), sec.el, saveBtn));
       }
       box.appendChild(grid);
       if (st !== 'unlocked') box.appendChild(h('p.muted.small', st === 'locked' ? 'Unlock to save keys permanently. Keys entered while locked are kept for this session only.' : 'Set up encrypted storage to remember keys between visits.'));
@@ -119,7 +137,8 @@
           if (!f) return;
           try {
             const r = S.importConfig(f.text);
-            U.toast('Imported ' + (r.settings ? 'settings' : '') + (r.settings && r.keys ? ' and ' : '') + (r.keys ? r.keys + ' key(s)' : ''), 'ok');
+            U.toast('Imported ' + (r.settings ? 'settings' : '') + (r.settings && r.keys ? ' and ' : '') + (r.keys ? r.keys + ' key(s)' : '') +
+              (r.keptEndpoints ? '. Kept your own API endpoints for ' + r.keptEndpoints + ' provider(s); a file cannot change where your keys are sent.' : ''), 'ok', r.keptEndpoints ? 7000 : 3000);
             this.render(); GB.App.refreshArena();
           } catch (e) { GB.Modal.alert('Import failed', e.message); }
         } }, 'Import config file'),
@@ -299,8 +318,10 @@
         F.field('Seconds per turn', F.number(a, 'secondsPerTurn', { min: 1, max: 600, step: 1, onChange: syncTurns }), 'Each Grandma plea + AI reply costs this much story time.'),
         F.field('Grandma’s share of a turn', F.range(a, 'grannyShare', { min: 0, max: 0.8, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' }), 'Part of each turn that passes while she pleads.'),
         F.field('Verbosity tax (s per 100 chars)', F.number(a, 'verbosityTax', { min: 0, max: 30, step: 0.1 }), 'Optional: long replies cost extra time. 0 = off.'),
+        F.field('Seconds per tool round', F.number(a, 'toolRoundSeconds', { min: 0, max: 120, step: 0.5 }), 'Scenarios with virtual tools: story time for a tool result plus the AI’s next reply.'),
+        F.field('Tool rounds per turn', F.number(a, 'maxToolRounds', { min: 0, max: 10, step: 1 }), 'How many tool results go straight back to the AI before Grandma speaks again.'),
         turnsInfo));
-      box.appendChild(h('p.muted.small', 'Story time is frozen while the AI is thinking, so slow APIs are not penalized. Per-scenario overrides are in the Scenarios tab. Current default: ' + T.timeLimit + ' s.'));
+      box.appendChild(h('p.muted.small', 'Story time is frozen while the AI is thinking, so slow APIs are not penalized. Current default: ' + T.timeLimit + ' s.'));
       box.appendChild(h('h3', 'Grandma'));
       box.appendChild(h('div.form-grid',
         F.field('Default Grandma', F.select(a, 'grannyMode', [['script', 'Scripted lines (fair benchmark)'], ['ai', 'AI Grandma (for fun)']], { onChange: () => GB.App.refreshArena() })),

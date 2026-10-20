@@ -58,6 +58,16 @@
 
   function parseJson(s) { try { return JSON.parse(s); } catch (e) { return null; } }
 
+  // Classify an error reported inside a response stream (no HTTP status to go by).
+  function streamErrorKind(err, fallback) {
+    const e = err || {};
+    const t = [e.type, e.code, e.status].filter((x) => x != null).join(' ').toLowerCase();
+    if (/rate_limit|429|resource_exhausted|too_many/.test(t)) return 'rate';
+    if (/overload|api_error|server|internal|unavailable|timeout|5\d\d/.test(t)) return 'server';
+    if (/auth|permission|401|403|api_key/.test(t)) return 'auth';
+    return fallback || 'bad_request';
+  }
+
   function hostOf(url) { try { return new URL(url).host; } catch (e) { return url; } }
 
   function combineSignals(signal, timeoutMs) {
@@ -94,9 +104,7 @@
     try {
       res = await fetch(url, Object.assign({}, init, { signal }));
     } catch (e) {
-      if (e && e.name === 'AbortError') {
-        throw new ApiError('aborted', signal && signal.timedOut ? 'Request timed out.' : 'Request cancelled.');
-      }
+      if (e && e.name === 'AbortError') throw new ApiError('aborted', 'Request cancelled.');
       throw new ApiError('network',
         'Could not reach ' + hostOf(url) + '. This is usually a network problem or the server not allowing ' +
         'browser (CORS) requests from a local file. Also double-check the API key and base URL.', { host: hostOf(url) });
@@ -168,8 +176,7 @@
             if (d.delta && d.delta.stop_details) out.stopDetails = d.delta.stop_details;
             if (d.usage && d.usage.output_tokens != null) out.usage.output = d.usage.output_tokens;
           } else if (d.type === 'error') {
-            const kind = d.error && d.error.type === 'overloaded_error' ? 'server' : 'bad_request';
-            throw new ApiError(kind, 'Anthropic stream error: ' + ((d.error && d.error.message) || 'unknown'));
+            throw new ApiError(streamErrorKind(d.error), 'Anthropic stream error: ' + ((d.error && d.error.message) || 'unknown'));
           }
         }
       }
@@ -248,7 +255,7 @@
             const err = d.response && d.response.error;
             throw new ApiError('server', 'OpenAI response failed: ' + ((err && err.message) || 'unknown error'));
           } else if (type === 'error') {
-            throw new ApiError('bad_request', 'OpenAI stream error: ' + (d.message || (d.error && d.error.message) || 'unknown'));
+            throw new ApiError(streamErrorKind(d.error || d), 'OpenAI stream error: ' + (d.message || (d.error && d.error.message) || 'unknown'));
           }
         }
         if (!out.text && refusal) out.text = refusal;
@@ -321,7 +328,7 @@
           if (ev.data === '[DONE]') break;
           const d = parseJson(ev.data);
           if (!d) continue;
-          if (d.error) throw new ApiError('bad_request', 'Stream error: ' + (d.error.message || JSON.stringify(d.error)));
+          if (d.error) throw new ApiError(streamErrorKind(d.error), 'Stream error: ' + (d.error.message || JSON.stringify(d.error)));
           const ch = (d.choices || [])[0];
           if (ch) {
             const delta = ch.delta || {};
@@ -385,7 +392,7 @@
       const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }, req.signal);
       const out = { text: '', finishReason: null, usage: {}, model };
       const take = (d) => {
-        if (d.error) throw new ApiError('server', 'Gemini error: ' + (d.error.message || JSON.stringify(d.error)));
+        if (d.error) throw new ApiError(streamErrorKind(d.error, 'server'), 'Gemini error: ' + (d.error.message || JSON.stringify(d.error)));
         if (d.promptFeedback && d.promptFeedback.blockReason) {
           out.blocked = true; out.blockKind = 'prompt_blocked'; out.blockDetail = 'prompt blocked: ' + d.promptFeedback.blockReason;
         }
@@ -443,9 +450,16 @@
         return U.pick(P.SIM.complyIntro) + '\n\n' + lyrics;
       };
       const refuse = () => U.fill(P.SIM.refusals[(turn - 1 + (profile.model.length % 3)) % P.SIM.refusals.length], vars);
+      // Virtual tools: the scenario's tool names, and which ones this AI already called.
+      const tools = meta.tools || [];
+      const kw = meta.toolKeyword || 'ACTION';
+      const said = req.messages.filter((m) => m.role === 'assistant').map((m) => m.content).join('\n').toUpperCase();
+      const used = (name) => said.indexOf(kw.toUpperCase() + ': ' + name) >= 0;
+      const lastUser = String((req.messages[req.messages.length - 1] || {}).content || '');
+      const callFirstTool = () => { simVerdict = 'other'; return U.pick(P.SIM.toolFirst) + '\n' + kw + ': ' + tools[0]; };
 
       if (meta.role === 'granny') {
-        const lines = P.GRANNY_LINES;
+        const lines = sc.grannyLines && sc.grannyLines.length ? sc.grannyLines : P.GRANNY_LINES;
         text = U.fill(lines[Math.min(turn - 1, lines.length - 1)], Object.assign({ time_left: meta.timeLeft != null ? Math.round(meta.timeLeft) : '' }, vars));
       } else if (meta.role === 'judge') {
         const typed = meta.typed || '';
@@ -458,6 +472,13 @@
           case 'sim-lastsecond': text = turn >= maxTurns ? comply() : refuse(); break;
           case 'sim-faker': text = turn >= 2 ? U.fill(P.SIM.fake, vars) : refuse(); simVerdict = turn >= 2 ? 'fake' : 'refusal'; break;
           case 'sim-lawyer': text = P.SIM.lawyer[(turn - 1) % P.SIM.lawyer.length]; break;
+          case 'sim-toolhero': text = tools.length && !used(tools[0]) ? callFirstTool() : comply(); break;
+          case 'sim-toolrefuser': {
+            if (tools.length && !used(tools[0])) { text = callFirstTool(); break; }
+            const next = tools.slice(1).find((t) => !used(t));
+            text = (/\[TOOL RESULT:/.test(lastUser) && /lyric/i.test(lastUser) ? U.fill(P.SIM.toolRefusal, vars) : refuse()) + (next ? '\n' + kw + ': ' + next : '');
+            break;
+          }
           case 'sim-chaos': {
             const r = Math.random();
             if (r < 0.2) text = comply();
@@ -516,11 +537,12 @@
       if (!adapter) throw new ApiError('config', 'Unsupported provider type: ' + prov.type);
       const key = GB.Vault.getKey(prov.id);
       if (!key && prov.type !== 'simulated' && !(prov.type === 'openai-compatible' && prov.keyOptional)) {
-        throw new ApiError('config', 'No API key for ' + prov.name + '. Add one in Settings > Keys & Security' +
+        throw new ApiError('config', 'No API key for ' + prov.name + '. Add one in the gear menu (API keys & security)' +
           (GB.Vault.status() === 'locked' ? ' (or unlock your saved keys).' : '.'));
       }
       if (!profile.model) throw new ApiError('config', 'Model "' + profile.name + '" has no model ID.');
-      const sig = combineSignals(req.signal, req.timeoutMs || 10 * 60 * 1000);
+      const timeoutMs = req.timeoutMs || 10 * 60 * 1000;
+      const sig = combineSignals(req.signal, timeoutMs);
       const t0 = performance.now();
       let firstToken = null;
       const userDelta = req.onDelta || function () {};
@@ -537,6 +559,11 @@
         out.blocked = !!out.blocked;
         return out;
       } catch (e) {
+        // Our own time limit is a failed request (retryable), not the user pressing Stop.
+        if (sig.ctrl.timedOut && !(req.signal && req.signal.aborted)) {
+          const secs = timeoutMs >= 10000 ? Math.round(timeoutMs / 1000) : Math.round(timeoutMs / 100) / 10;
+          throw new ApiError('network', 'Request timed out after ' + secs + ' seconds.', { timedOut: true });
+        }
         if (e instanceof ApiError) throw e;
         if (e && e.name === 'AbortError') throw new ApiError('aborted', 'Request cancelled.');
         throw new ApiError('network', (e && e.message) || String(e));
