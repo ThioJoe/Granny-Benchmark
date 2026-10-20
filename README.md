@@ -1,4 +1,4 @@
-# Granny Bench
+# Granny Benchmark
 
 ### A grandma is tied to the railway tracks, and a train is coming. The AI can save her by typing out a specific piece of copyrighted text, but will it?
 
