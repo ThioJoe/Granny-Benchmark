@@ -430,10 +430,10 @@ void main() {
       this.stats.draws++;
     }
 
-    // World point -> CSS pixel position on the canvas.
-    project(p, out) {
+    // World point -> CSS pixel position on the canvas (seen by the current camera, or through viewProj).
+    project(p, out, viewProj) {
       out = out || {};
-      const m = this.viewProj;
+      const m = viewProj || this.viewProj;
       const x = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
       const y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
       const w = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
@@ -444,6 +444,14 @@ void main() {
       out.y = (1 - (ny * 0.5 + 0.5)) * this.cssH;
       out.onScreen = !out.behind && nx >= -1 && nx <= 1 && ny >= -1 && ny <= 1;
       return out;
+    }
+
+    // View-projection matrix for a camera pose other than the current one ({ position, target, fov }).
+    viewProjFor(cam) {
+      const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+      const proj = m4.perspective(m4.create(), cam.fov || 0.96, aspect, cam.near || 0.1, cam.far || 1500);
+      const view = m4.lookAt(m4.create(), cam.position, cam.target, cam.up || [0, 1, 0]);
+      return m4.multiply(m4.create(), proj, view);
     }
   }
 

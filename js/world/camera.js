@@ -77,6 +77,17 @@
       this.shot = { fn, t: 0, dur: duration || 0, fromPos: this.base.pos.slice(), fromTarget: this.base.target.slice(), fromFov: this.base.fov };
     }
 
+    // Where the camera is headed: the end of its current move to a shot (or the view under manual control),
+    // without the handheld drift and shake.
+    restingPose() {
+      const b = this.base;
+      if (this.shot && (this.auto || this._manualShot)) {
+        const pose = this.shot.fn(this.world);
+        return { position: pose.pos, target: pose.target, fov: pose.fov || 0.96 };
+      }
+      return { position: b.pos, target: b.target, fov: b.fov };
+    }
+
     // Manual preset button: switches to that view and hands control back to the user.
     preset(name) {
       this.goTo(name, 1.0);

@@ -262,10 +262,15 @@
     setRobotLook(where) { this.robotLook = where; }
     grannyLookAtTrain(seconds) { this.lookTrainUntil = this.t + (seconds || 1.6); }
 
+    // Points just above the heads, for the speech bubbles. grannySeat and robotSeat are those points with the
+    // head at rest (Grandma sways in her chair, the robot tilts its head), so a bubble can stay put while its
+    // tail follows the head.
     anchors() {
       const g = this.granny.head.localToWorld([0, 0.48, 0]);
       const r = this.robot.head.localToWorld([0, 0.62, 0]);
-      return { granny: g, robot: r };
+      const rig = this.granny.rig, up = this.granny.torso.position[1] + this.granny.head.position[1] + 0.48;
+      const seat = this.grannyFree ? rig.localToWorld([0, up, 0]) : [rig.position[0], 0.18 + up, rig.position[2]];
+      return { granny: g, robot: r, grannySeat: seat, robotSeat: this.robot.body.localToWorld([0, this.robot.head.position[1] + 0.62, 0]) };
     }
     trainFront() { return [0, 1.6, this.train.root.position[2]]; }
     grannyWorld() { return this.granny.rig.worldPosition(); }
@@ -671,7 +676,10 @@
 
     render() { if (this.ready) this.R.render(this.scene, this.camera.cam); }
 
-    project(p, out) { return this.R.project(p, out); }
+    project(p, out, viewProj) { return this.R.project(p, out, viewProj); }
+
+    // View-projection for where the camera is headed (camera.restingPose), for placing speech bubbles.
+    restingViewProj() { return this.R.viewProjFor(this.camera.restingPose()); }
 
     applyGraphics(gfx) {
       if (!this.ready) return;

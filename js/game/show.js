@@ -273,7 +273,6 @@
       const maxChars = Number(GB.Settings.data.voice.maxRobotChars) || 700;
       let spoken = said.trim() || (resp.blocked ? 'Output blocked.' : '...');
       if (spoken.length > maxChars) spoken = spoken.slice(0, maxChars).replace(/\s+\S*$/, '') + ' ...';
-      if (!skip) GB.Bubbles.show('robot', spoken);
       this._talk('robot', !skip);
       let brakeP = null;
       const brakeDur = this.fast ? 1.3 : 2.9;
@@ -286,6 +285,8 @@
       } else {
         w.camera.cue('robot');
       }
+      // After the camera cue, so the bubble is placed for the new shot.
+      if (!skip) GB.Bubbles.show('robot', spoken);
       const h = skip ? null : this._speak('robot', spoken);
       const est = h ? this._est(h) : brakeDur;
       const cut = o.cutoffFraction != null && o.cutoffFraction < 1;

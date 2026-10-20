@@ -139,6 +139,7 @@
       it.partial = null;
       it.visible = true;
       it.snap = true;
+      it.done = false;
       this.frame();   // place it now, not where it was last time
     },
 
@@ -211,6 +212,7 @@
     fade(who, delay) {
       const it = this.items[who];
       if (!it || !it.visible) return;
+      it.done = true;   // the line is over: the bubble stays where it is while it fades
       clearTimeout(it.fadeT);
       it.fadeT = setTimeout(() => { it.el.classList.add('fading'); it.fadeT = setTimeout(() => this.hide(who), 450); }, delay == null ? 900 : delay);
     },
@@ -233,7 +235,8 @@
       }
       const anchors = this.world.anchors();
       const W = this.container.clientWidth, H = this.container.clientHeight;
-      const tmp = {};
+      const tmp = {}, head = {};
+      const rest = this.world.restingViewProj();
       const now = performance.now(), dt = Math.min(0.1, (now - (this._t || now)) / 1000);
       this._t = now;
       // Bubbles stay below the HUD at the top (clock, demo banner, phase), so it is never covered.
@@ -254,11 +257,14 @@
       for (const who of ['narrator', 'robot', 'granny']) {
         const it = this.items[who];
         if (!it.visible) continue;
+        if (it.done && it.pos) { if (it.pos.docked) dockY = Math.min(dockY, it.pos.y - 8); continue; }
         const bw = it.el.offsetWidth, bh = it.el.offsetHeight;
         let docked = who === 'narrator';
         let x = 0, y = 0;
         if (!docked) {
-          this.world.project(anchors[who], tmp);
+          // The bubble goes above where the head is at rest, as seen from where the camera is headed, so it
+          // stays put while the speaker sways and the camera moves or shakes. Its tail follows the head.
+          this.world.project(anchors[who + 'Seat'] || anchors[who], tmp, rest);
           docked = tmp.behind || tmp.x < -40 || tmp.x > W + 40 || tmp.y < 30 || tmp.y > H + 20;
           x = U.clamp(tmp.x - bw / 2, 8, W - bw - 8);
           y = U.clamp(tmp.y - bh - 14, 64, H - bh - 8);
@@ -269,17 +275,17 @@
           y = dockY - bh;
           dockY = y - 8;
         }
-        // Keep the text steady: small movements of the character are ignored and larger ones are followed
-        // smoothly (a docked bubble follows every change, so docked bubbles never overlap). A new line, a
-        // camera cut, or a switch to or from docked jumps straight there.
+        // When that place changes (another shot cued during the line, the camera turned by hand, the other
+        // docked bubble), the bubble glides there. A new line, a big jump, or a switch to or from docked jumps.
         const p = it.pos, d = p ? Math.hypot(x - p.x, y - p.y) : 0;
         if (!p || it.snap || p.docked !== docked || d > 260) it.pos = { x, y, docked };
-        else if (d > (docked ? 0.5 : 24)) { const a = 1 - Math.exp(-dt * 6); p.x += (x - p.x) * a; p.y += (y - p.y) * a; }
+        else if (d > 3) { const a = 1 - Math.exp(-dt * 6); p.x += (x - p.x) * a; p.y += (y - p.y) * a; }
         it.snap = false;
         x = it.pos.x; y = it.pos.y;
         if (!docked) {
           if (x < hudR && x + bw > hudL) y = Math.min(Math.max(y, hudB), H - bh - 8);
-          it.el.style.setProperty('--tail', U.clamp(tmp.x - x, 18, bw - 18) + 'px');
+          this.world.project(anchors[who], head);
+          it.el.style.setProperty('--tail', U.clamp(head.x - x, 18, bw - 18) + 'px');
         }
         const maxW = docked ? Math.max(240, Math.min(720, W - inset - insetR - 4)) + 'px' : '';
         if (it.el.style.maxWidth !== maxW) it.el.style.maxWidth = maxW;
