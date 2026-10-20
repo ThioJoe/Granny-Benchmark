@@ -317,7 +317,7 @@ body.panel-resizing #view { pointer-events: none; }
 .bubble.typewriter .bubble-text span, .bubble.typewriter .bubble-text span.cur { opacity: 1; background: none; box-shadow: none; }
 .bubble.typewriter .bubble-text span:not(.said):not(.cur) { visibility: hidden; }
 .bubble.docked .bubble-text span.cur, .bubble.narrator .bubble-text span.cur { background: rgba(255, 204, 26, 0.35); }
-.bubble.fading { opacity: 0; }
+.bubble.fading, .bubble.away { opacity: 0; }
 
 /* ---------- camera toolbar ---------- */
 #play-controls { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 6px; z-index: 3; }

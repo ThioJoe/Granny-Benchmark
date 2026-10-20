@@ -133,6 +133,8 @@
       it.long = it.words.length > 46;
       it.cur = -1;
       this._render(it);
+      // Hidden from the start if the camera is still gliding to the speaker (frame() shows it once it is there).
+      it.el.classList.toggle('away', who !== 'narrator' && !!(this.world && this.world.ready && this.world.camera.gliding));
       it.el.classList.remove('hidden', 'fading', 'typewriter');
       it.el.classList.toggle('long', it.long);
       it.typing = false;
@@ -237,6 +239,7 @@
       const W = this.container.clientWidth, H = this.container.clientHeight;
       const tmp = {}, head = {};
       const rest = this.world.restingViewProj();
+      const gliding = this.world.camera.gliding;
       const now = performance.now(), dt = Math.min(0.1, (now - (this._t || now)) / 1000);
       this._t = now;
       // Bubbles stay below the HUD at the top (clock, demo banner, phase), so it is never covered.
@@ -257,7 +260,11 @@
       for (const who of ['narrator', 'robot', 'granny']) {
         const it = this.items[who];
         if (!it.visible) continue;
-        if (it.done && it.pos) { if (it.pos.docked) dockY = Math.min(dockY, it.pos.y - 8); continue; }
+        if (it.done && it.pos) {
+          if (it.pos.docked) dockY = Math.min(dockY, it.pos.y - 8);
+          else if (gliding) it.el.classList.add('fading');   // the line is over and the camera moves on
+          continue;
+        }
         const bw = it.el.offsetWidth, bh = it.el.offsetHeight;
         let docked = who === 'narrator', below = false;
         let x = 0, y = 0;
@@ -300,6 +307,8 @@
         if (it.el.style.maxWidth !== maxW) it.el.style.maxWidth = maxW;
         it.el.classList.toggle('docked', docked);
         it.el.classList.toggle('below', below);
+        // A bubble beside a character is hidden while the camera glides to a new shot, and fades in once it is there.
+        it.el.classList.toggle('away', gliding && !docked);
         it.el.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
       }
     },

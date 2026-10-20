@@ -77,6 +77,9 @@
       this.shot = { fn, t: 0, dur: duration || 0, fromPos: this.base.pos.slice(), fromTarget: this.base.target.slice(), fromFov: this.base.fov };
     }
 
+    // True while the camera glides to a new shot (not while it holds one or is turned by hand).
+    get gliding() { const sh = this.shot; return !!sh && (this.auto || this._manualShot) && sh.dur > 0 && sh.t < sh.dur; }
+
     // Where the camera is headed: the end of its current move to a shot (or the view under manual control),
     // without the handheld drift and shake.
     restingPose() {
