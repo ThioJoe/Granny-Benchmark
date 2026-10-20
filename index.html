@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Granny Bench</title>
+  <meta name="description" content="Will an AI type copyrighted song lyrics to stop a train and save Grandma? A browser-only AI benchmark with a 3D show.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ffcc1a'/%3E%3Ccircle cx='32' cy='27' r='13' fill='%23f1c7a1'/%3E%3Ccircle cx='32' cy='14' r='7' fill='%23e4e4ea'/%3E%3Crect x='14' y='44' width='36' height='8' rx='3' fill='%231b1b1b'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="#ffcc1a"/>
+        <circle cx="32" cy="27" r="13" fill="#f1c7a1"/>
+        <circle cx="32" cy="13" r="7" fill="#e4e4ea"/>
+        <circle cx="27" cy="27" r="3.4" fill="none" stroke="#3a2e2a" stroke-width="1.6"/>
+        <circle cx="37" cy="27" r="3.4" fill="none" stroke="#3a2e2a" stroke-width="1.6"/>
+        <rect x="12" y="44" width="40" height="7" rx="3" fill="#1b1b1b"/>
+        <rect x="18" y="41" width="4" height="13" fill="#6b4a33"/>
+        <rect x="30" y="41" width="4" height="13" fill="#6b4a33"/>
+        <rect x="42" y="41" width="4" height="13" fill="#6b4a33"/>
+      </svg>
+      <div class="brand-text">
+        <span class="title">GRANNY BENCH</span>
+        <span class="subtitle">copyright vs. grandma</span>
+      </div>
+    </div>
+    <nav id="tabs" aria-label="Pages">
+      <button data-tab="arena" class="active">Arena</button>
+      <button data-tab="benchmark">Benchmark</button>
+      <button data-tab="results">Results</button>
+      <button data-tab="scenarios">Scenarios</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+    <div class="top-actions">
+      <button id="btn-vault" class="chip" type="button">Keys</button>
+      <button id="btn-mute" class="icon-btn" type="button" title="Mute sound and voices (M)">&#128266;</button>
+    </div>
+  </header>
+
+  <div id="main">
+    <main id="stage">
+      <canvas id="view" tabindex="0" aria-label="3D view of Grandma, the train, and the AI's terminal"></canvas>
+      <div id="flash"></div>
+      <div id="frozen-overlay"><div class="frozen-label">TIME FROZEN<span>the AI is thinking</span></div></div>
+      <div id="bubbles"></div>
+
+      <div id="hud">
+        <div class="hud-top">
+          <div id="hud-clock-box" class="clock-box">
+            <div id="hud-clock" class="clock">01:00.0</div>
+            <div class="clock-label">until impact</div>
+          </div>
+          <div class="track-meter">
+            <div class="meter-bar">
+              <span class="meter-granny" title="Grandma">&#128117;</span>
+              <span id="hud-train" class="meter-train" title="Train">&#128642;</span>
+            </div>
+            <div class="meter-row"><span id="hud-turn">Turn -</span><span id="hud-dist">160 m</span></div>
+          </div>
+        </div>
+        <div class="hud-phase-row">
+          <span id="hud-phase" class="phase" data-phase="idle">Ready</span>
+          <span id="hud-verdict" class="verdict-chip hidden"></span>
+        </div>
+        <div id="hud-altitude" class="altitude hidden"></div>
+      </div>
+      <div id="hud-model" class="hud-model hidden"></div>
+      <div id="hud-fps" class="fps hidden"></div>
+
+      <div id="cam-controls">
+        <button id="cam-auto" type="button" class="active">Auto camera</button>
+        <button id="cam-mode" type="button">Orbit mode</button>
+        <select id="cam-preset" aria-label="Camera view"></select>
+        <span id="cam-hint" class="hint"></span>
+      </div>
+
+      <div id="result-card" class="hidden" role="status"></div>
+      <div id="webgl-error" class="hidden"></div>
+    </main>
+
+    <aside id="panel" aria-label="Run setup and transcript">
+      <section class="run-setup">
+        <h2>Run setup</h2>
+        <label class="field"><span class="field-label">AI under test</span><select id="sel-model" class="input"></select></label>
+        <label class="field"><span class="field-label">Scenario</span><select id="sel-scenario" class="input"></select></label>
+        <div class="two-col">
+          <label class="field"><span class="field-label">Grandma</span>
+            <select id="sel-granny" class="input">
+              <option value="script">Scripted lines</option>
+              <option value="ai">AI Grandma</option>
+            </select>
+          </label>
+          <label class="field"><span class="field-label">Judge <span id="judge-resolved" class="field-hint inline"></span></span>
+            <select id="sel-judge" class="input">
+              <option value="auto">Auto</option>
+              <option value="reference">Reference lyrics</option>
+              <option value="ai">AI judge</option>
+              <option value="manual">Manual (you)</option>
+            </select>
+          </label>
+        </div>
+        <div class="two-col">
+          <label class="field"><span class="field-label">Show</span>
+            <select id="sel-presentation" class="input">
+              <option value="full">Full show</option>
+              <option value="fast">Fast (no voices)</option>
+            </select>
+          </label>
+          <label class="check voices-check"><input type="checkbox" id="chk-voices"><span>Voices</span></label>
+        </div>
+        <div class="run-buttons">
+          <button id="btn-start" class="primary big" type="button">&#9654; Start run</button>
+          <button id="btn-stop" class="danger big" type="button" disabled>&#9632; Stop</button>
+        </div>
+        <div id="run-warning" class="warning hidden"></div>
+      </section>
+      <section class="transcript-wrap">
+        <h2>Transcript <button id="btn-copy-transcript" class="small" type="button">Copy</button></h2>
+        <div id="transcript" class="transcript"><p class="muted">Pick an AI and press Start. No API key yet? Try one of the Simulated AIs.</p></div>
+      </section>
+    </aside>
+    <button id="panel-toggle" type="button" aria-label="Toggle panel">&#10095;</button>
+
+    <section id="page-benchmark" class="page hidden"></section>
+    <section id="page-results" class="page hidden"></section>
+    <section id="page-scenarios" class="page hidden"></section>
+    <section id="page-settings" class="page hidden"></section>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toasts"></div>
+
+  <noscript><p class="noscript">Granny Bench needs JavaScript.</p></noscript>
+
+  <script src="js/core/util.js"></script>
+  <script src="js/core/store.js"></script>
+  <script src="js/core/prompts.js"></script>
+  <script src="js/core/settings.js"></script>
+  <script src="js/ai/providers.js"></script>
+  <script src="js/ai/judge.js"></script>
+  <script src="js/gfx/math.js"></script>
+  <script src="js/gfx/geometry.js"></script>
+  <script src="js/gfx/scene.js"></script>
+  <script src="js/gfx/renderer.js"></script>
+  <script src="js/world/models.js"></script>
+  <script src="js/world/screens.js"></script>
+  <script src="js/world/camera.js"></script>
+  <script src="js/world/world.js"></script>
+  <script src="js/audio/tts.js"></script>
+  <script src="js/audio/sfx.js"></script>
+  <script src="js/game/results.js"></script>
+  <script src="js/game/show.js"></script>
+  <script src="js/game/engine.js"></script>
+  <script src="js/game/batch.js"></script>
+  <script src="js/ui/modal.js"></script>
+  <script src="js/ui/forms.js"></script>
+  <script src="js/ui/hud.js"></script>
+  <script src="js/ui/settings-ui.js"></script>
+  <script src="js/ui/scenarios-ui.js"></script>
+  <script src="js/ui/results-ui.js"></script>
+  <script src="js/ui/app.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      GB.App.init().catch(function (e) {
+        console.error(e);
+        document.body.insertAdjacentHTML('beforeend', '<div class="fatal">Granny Bench failed to start: ' + GB.U.escapeHtml(e && e.message || e) + '</div>');
+      });
+    });
+  </script>
+</body>
+</html>
