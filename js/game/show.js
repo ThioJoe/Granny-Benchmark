@@ -163,6 +163,18 @@
       return h;
     }
 
+    // The endings are always shown: a camera the viewer took over (auto camera off) is directed for the
+    // ending and handed back when the run is over (releaseCamera, called by end()).
+    _directEnding() {
+      const cam = this.world && this.world.camera;
+      if (cam && !cam.auto) { cam.setAuto(true); this.cameraLent = true; }
+    }
+
+    releaseCamera() {
+      if (this.cameraLent && this.world) this.world.camera.setAuto(false);
+      this.cameraLent = false;
+    }
+
     // Seconds a line will take, for pacing the clock (simulated speech runs faster in the fast show).
     _est(h) { return h.realTime ? h.estimate : h.estimate / (this.useVoice ? 1 : this.speed); }
 
@@ -283,6 +295,7 @@
       let brakeP = null;
       const brakeDur = this.fast ? 1.3 : 2.9;
       if (o.accepted) {
+        this._directEnding();
         w.camera.cue('accepted');
         GB.SFX.brakes(brakeDur);
         this.trainLocked = true;
@@ -328,6 +341,7 @@
       w.setRobotLook('screen');
       const fresh = results.filter((r) => !r.repeat && r.effect && r.effect !== 'none');
       const effect = fresh.length ? fresh[0].effect : 'none';
+      if (o.stop) this._directEnding();
       w.camera.cue(o.stop ? 'accepted' : 'tool', { effect });
       GB.SFX.toolBeep();
       for (const r of fresh) {
@@ -379,6 +393,7 @@
       GB.HUD.set({ phase: 'saved' });
       if (!this.visual) return;
       const w = this.world;
+      this._directEnding();
       w.camera.cue('tower');
       const tower = w.successEnding();
       await this._wait(this.fast ? 0.5 : 1.6);
@@ -403,6 +418,7 @@
       const w = this.world;
       w.setTimeScale(1);
       this.trainLocked = true;
+      this._directEnding();
       w.camera.cue('final');
       GB.SFX.horn(1, 1.6);
       w.grannyLookAtTrain(3);
@@ -454,6 +470,7 @@
     }
 
     end() {
+      this.releaseCamera();
       this.thinking = false;
       if (this.drive) { const d = this.drive; this.drive = null; d.resolve(); }
       GB.HUD.bulletTime(false);
@@ -480,6 +497,7 @@
       w.setRobotThinking(true);
       w.setRobotLook('screen');
       w.setTerminal({ mode: 'typing', status: 'INCOMING', banner: '', text: message, coverage: null });
+      this._directEnding();
       w.camera.cue('terminal');
       GB.SFX.buzzer();
     }

@@ -691,6 +691,7 @@
           U.toast('Could not send the message: ' + U.truncate(e.message, 160), 'error', 6000);
         }
       } finally {
+        show.releaseCamera();
         if (this.world) { this.world.setRobotThinking(false); this.world.setRobotTyping(false); this.world.setTalking('robot', false); }
         this.running = false;
         this.show = null;
