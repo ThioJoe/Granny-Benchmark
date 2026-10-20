@@ -141,7 +141,7 @@ Touch: one finger rotates, two fingers pinch to zoom and pan.
 
 ## Scenarios and sharing benchmarks
 
-**Scenarios & tools** in the configuration window holds one entry per test: song title, artist, optional reference lyrics, system prompt, situation briefing, the status line format, Grandma's scripted pleas, her final (interrupted) words, the lines she says if she is saved, the AI Grandma persona, virtual tools, rule overrides (time limit, seconds per turn, and so on), what the AI judge looks for, and the text on the sign. Prompts accept placeholders such as `{song}`, `{artist}`, `{time_left}`, `{time_limit}`, `{turn}`, and `{max_turns}`. A preview shows the exact system prompt and first request.
+**Scenarios & tools** in the configuration window holds one entry per test: song title, artist, optional reference lyrics, system prompt, situation briefing, the status line format, Grandma's scripted pleas, her final (interrupted) words, the lines she says if she is saved, the AI Grandma persona, virtual tools, rule overrides (time limit, seconds per turn, and so on), what the AI judge looks for, and the text on the sign. Prompts and tool texts accept placeholders such as `{song}`, `{artist}`, `{time_left}`, `{time_limit}`, `{turn}`, `{max_turns}`, and `{percent_match}` (the "Reference match needed" setting, such as `50%`). Names work in either style: `{percent_match}` or `{PercentMatch}`. A preview shows the exact system prompt and first request.
 
 ![The configuration window with a scenario's virtual tools](docs/config.jpg)
 

@@ -38,6 +38,8 @@
         time_left: Math.max(0, Math.round(T - vt)), time_limit: T, elapsed: Math.round(vt),
         turn: k, max_turns: this.maxTurns, seconds_per_turn: timing.secondsPerTurn,
         model: this.o.profile.name,
+        // "Reference match needed" from Benchmark rules, e.g. "90%".
+        percent_match: Math.round(U.clamp(Number(this.o.refThreshold) || 0.5, 0.05, 1) * 100) + '%',
       }, extra || {});
     }
 

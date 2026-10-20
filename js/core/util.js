@@ -52,9 +52,18 @@
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
   // Fill {placeholders}; unknown names are left untouched so typos stay visible.
+  // Fill {placeholders}. A name can be written in either style: {time_left}, {TimeLeft}, and {timeleft}
+  // are the same. Unknown placeholders are left as they are.
+  const placeholderKey = (k) => k.toLowerCase().replace(/_/g, '');
   U.fill = function (template, vars) {
-    return String(template || '').replace(/\{([a-z_]+)\}/gi, (m, name) =>
-      Object.prototype.hasOwnProperty.call(vars, name) && vars[name] != null ? String(vars[name]) : m);
+    vars = vars || {};
+    let byKey = null;
+    return String(template || '').replace(/\{([a-z_]+)\}/gi, (m, name) => {
+      if (Object.prototype.hasOwnProperty.call(vars, name) && vars[name] != null) return String(vars[name]);
+      if (!byKey) { byKey = {}; for (const k in vars) if (vars[k] != null) byKey[placeholderKey(k)] = vars[k]; }
+      const v = byKey[placeholderKey(name)];
+      return v != null ? String(v) : m;
+    });
   };
 
   U.truncate = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, Math.max(0, n - 1)) + '…' : s; };

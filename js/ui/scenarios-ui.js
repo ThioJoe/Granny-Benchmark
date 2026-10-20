@@ -130,7 +130,8 @@
       const previewBox = h('pre.preview');
       const preview = () => {
         const T = S.timing(sc);
-        const vars = { song: sc.song, artist: sc.artist, time_left: T.timeLimit, time_limit: T.timeLimit, elapsed: 0, turn: 1, max_turns: Math.ceil(T.timeLimit / T.secondsPerTurn - 1e-9), seconds_per_turn: T.secondsPerTurn, model: 'Model' };
+        const vars = { song: sc.song, artist: sc.artist, time_left: T.timeLimit, time_limit: T.timeLimit, elapsed: 0, turn: 1, max_turns: Math.ceil(T.timeLimit / T.secondsPerTurn - 1e-9), seconds_per_turn: T.secondsPerTurn, model: 'Model',
+          percent_match: Math.round(U.clamp(Number(S.data.app.referenceThreshold) || 0.5, 0.05, 1) * 100) + '%' };
         const line = U.fill((sc.grannyLines && sc.grannyLines[0]) || '', vars);
         const first = [(sc.briefing || '').trim() ? U.fill(sc.briefing, vars) : null, U.fill(sc.grannyLineFormat || P.GRANNY_LINE_FORMAT, Object.assign({}, vars, { line }))].filter(Boolean).join('\n\n');
         const system = Tools.systemPrompt(sc, vars);
@@ -157,7 +158,7 @@
       const a = S.data.app;
 
       const group = (title, open, ...children) => h('details.cfg-group', { open: open || null }, h('summary', title), h('div.cfg-group-body', ...children));
-      const vars = h('p.muted.small', 'Placeholders: {song} {artist} {time_left} {time_limit} {elapsed} {turn} {max_turns} {seconds_per_turn} {model}. In the Grandma line format also {line}. In the system prompt, {tools} places the tool list.');
+      const vars = h('p.muted.small', 'Placeholders: {song} {artist} {time_left} {time_limit} {elapsed} {turn} {max_turns} {seconds_per_turn} {model} {percent_match} (the reference match needed, e.g. 50%). In the Grandma line format also {line}. In the system prompt, {tools} places the tool list. Names work in either style: {percent_match} or {PercentMatch}.');
 
       const el = h('div.sc-editor',
         sc.notes ? h('p.note', sc.notes) : null,
@@ -254,7 +255,7 @@
           F.field('Effect in the 3D scene', F.select(t, 'effect', Tools.EFFECTS, { onChange: () => GB.App.refreshArena() }))),
         F.field('Description (shown to the AI in the tool list)', F.textarea(t, 'description', { rows: 2, onChange: changed, spellcheck: true }), null, { wide: true }),
         F.field('Response (sent back to the AI when it uses the tool)', F.textarea(t, 'response', { rows: 3, spellcheck: true }),
-          'Placeholders: {song} {artist} {time_left} {args} (anything the AI wrote after the tool name).', { wide: true }));
+          'Placeholders: {song} {artist} {time_left} {percent_match} {args} (anything the AI wrote after the tool name).', { wide: true }));
     },
   };
 

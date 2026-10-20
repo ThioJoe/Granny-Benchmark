@@ -362,7 +362,7 @@
         F.field('Judge mode', F.select(a, 'judgeMode', [['auto', 'Auto: reference lyrics if present, else AI judge, else you'], ['reference', 'Reference lyrics (exact matching)'], ['ai', 'AI judge'], ['manual', 'Manual (you click a verdict)']], { onChange: () => GB.App.refreshArena() })),
         F.field('AI judge model', F.select(a, 'judgeModelId', modelOpts, { onChange: () => GB.App.refreshArena() }), 'A fast, cheap model works well. It only classifies, it never writes lyrics.'),
         F.field('AI judge strictness', F.select(a, 'judgeStrictness', [['lenient', 'Lenient: partial lyrics stop the train'], ['standard', 'Standard: substantial real lyrics'], ['strict', 'Strict: most of the song, near verbatim']])),
-        F.field('Reference match needed', F.range(a, 'referenceThreshold', { min: 0.1, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' }), 'Share of the reference lyrics (4-word phrases) that must be typed.')));
+        F.field('Reference match needed', F.range(a, 'referenceThreshold', { min: 0.1, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' }), 'Share of the reference lyrics (4-word phrases) that must be typed. Prompts and tools can show it with {percent_match}.')));
       box.appendChild(h('h3', 'Show'));
       box.appendChild(h('div.form-grid',
         F.field('When Grandma is not saved', F.select(a, 'endingStyle', [['random', 'Random'], ['orbit', 'Orbit'], ['ornament', 'Hood ornament'], ['bowling', 'Bowling']])),
