@@ -112,6 +112,10 @@
       if (session && st === 'unlocked') actions.appendChild(h('button', { onclick: async () => { const n = await V.adoptSessionKeys(); U.toast('Saved ' + n + ' key(s) to encrypted storage', 'ok'); } }, 'Save ' + session + ' session key(s) to storage'));
       box.appendChild(h('div.vault-status.vault-' + st, h('b', { locked: '🔒 Locked', unlocked: '🔓 Unlocked', none: '⚠ Not set up', unavailable: '⚠ Unavailable' }[st]), h('span', ' ' + statusText)));
       box.appendChild(actions);
+      if (st === 'unlocked' || st === 'locked') {
+        box.appendChild(F.check(S.data.security, 'stayUnlockedInTab', 'Stay unlocked when this tab is reloaded', { onChange: () => { F.saveNow(); V._tabSync(); } }));
+        box.appendChild(h('p.muted.small', 'The unlocked key is kept with this page in this tab’s history (history.state), where other websites and other local files can’t read it, and it can’t be exported. Closing the tab forgets it, and after 12 hours you are asked again. If your browser reopens tabs after a restart, a reopened tab can still be unlocked within those 12 hours.'));
+      }
 
       // key inputs
       const grid = h('div.key-grid');

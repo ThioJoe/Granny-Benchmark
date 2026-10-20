@@ -83,6 +83,10 @@
     );
   }
 
+  // Where a tab remembers its unlocked key across reloads (a field of history.state), and how long.
+  const TAB_FIELD = 'gbVault';
+  const TAB_MAX_AGE = 12 * 3600 * 1000;   // a tab reopened later than this asks for the passphrase again
+
   // Secrets live in memory once unlocked. The derived CryptoKey is non-extractable,
   // so re-saving after an edit does not need the passphrase again.
   const Vault = {
@@ -108,25 +112,27 @@
       this._iter = ITERATIONS;
       this._key = await deriveKey(passphrase, this._salt, ITERATIONS);
       await this._persist();
+      this._tabSync();
       this.events.emit('change');
     },
 
     async unlock(passphrase) {
       const blob = Store.get(VAULT_KEY, null);
       if (!blob) throw new Error('No saved vault.');
-      const salt = b64.to(blob.salt);
-      const iter = Number(blob.iter) || ITERATIONS;
-      const key = await deriveKey(passphrase, salt, iter);
-      let plain;
-      try {
-        plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64.to(blob.iv) }, key, b64.to(blob.ct));
-      } catch (e) {
-        throw new Error('Wrong passphrase.');
-      }
+      const key = await deriveKey(passphrase, b64.to(blob.salt), Number(blob.iter) || ITERATIONS);
+      try { await this._open(key); } catch (e) { throw new Error('Wrong passphrase.'); }
+      this._tabSync();
+    },
+
+    // Decrypt the saved vault with a key and keep it unlocked (throws if the key does not fit).
+    async _open(key) {
+      const blob = Store.get(VAULT_KEY, null);
+      if (!blob) throw new Error('No saved vault.');
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64.to(blob.iv) }, key, b64.to(blob.ct));
       const data = JSON.parse(dec.decode(plain));
       this._key = key;
-      this._salt = salt;
-      this._iter = iter;
+      this._salt = b64.to(blob.salt);
+      this._iter = Number(blob.iter) || ITERATIONS;
       this._secrets = (data && data.keys) || {};
       this.events.emit('change');
     },
@@ -134,7 +140,40 @@
     lock() {
       this._key = null;
       this._secrets = {};
+      this._tabSync();
       this.events.emit('change');
+    },
+
+    // ---- staying unlocked when the tab is reloaded ----
+    // The unlocked key is kept in history.state: data that belongs to this page's entry in this tab's
+    // history. Only this page can read it there. Other websites and other local files cannot, even when
+    // opened later in the same tab, and the key is non-extractable, so it can be used but never read out.
+    _tabEnabled() {
+      const s = GB.Settings && GB.Settings.data && GB.Settings.data.security;
+      return !s || s.stayUnlockedInTab !== false;
+    },
+
+    // Store the current key for this tab, or remove it (when locked, deleted, or the option is off).
+    _tabSync() {
+      try {
+        const st = Object.assign({}, history.state);
+        if (this._key && this._tabEnabled()) st[TAB_FIELD] = { key: this._key, at: Date.now() };
+        else if (TAB_FIELD in st) delete st[TAB_FIELD];
+        else return;
+        history.replaceState(st, '');
+      } catch (e) { /* this browser cannot keep a key there: the passphrase is asked again after a reload */ }
+    },
+
+    // At startup: unlock with the key this tab kept from before the reload, if there is a fitting one.
+    async resumeFromTab() {
+      let saved = null;
+      try { saved = history.state && history.state[TAB_FIELD]; } catch (e) { /* ignore */ }
+      if (!saved || this._key || !this.exists()) return false;
+      if (this._tabEnabled() && typeof CryptoKey !== 'undefined' && saved.key instanceof CryptoKey && Date.now() - (Number(saved.at) || 0) < TAB_MAX_AGE) {
+        try { await this._open(saved.key); this._tabSync(); return true; } catch (e) { /* the vault changed since */ }
+      }
+      this._tabSync();
+      return false;
     },
 
     async changePassphrase(newPass) {
@@ -149,6 +188,7 @@
       Store.remove(VAULT_KEY);
       this._key = null;
       this._secrets = {};
+      this._tabSync();
       this.events.emit('change');
     },
 

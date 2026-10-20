@@ -55,7 +55,8 @@
       GB.Vault.events.on('change', () => { this.refreshArena(); this._vaultChip(); });
       this._vaultChip();
 
-      // unlock prompt if keys are saved
+      // Unlock prompt if keys are saved, unless this tab was unlocked before a reload.
+      if (GB.Vault.status() === 'locked') await GB.Vault.resumeFromTab();
       if (GB.Vault.status() === 'locked') setTimeout(() => this.unlockVault(), 250);
 
       // first user gesture enables audio

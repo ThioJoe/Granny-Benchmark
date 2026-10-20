@@ -87,7 +87,7 @@ No song lyrics are included in this project. The only bundled reference lyrics a
 
 Keys never leave your browser except in requests to the provider they belong to. You have three options:
 
-1. **Encrypted storage (recommended).** In the configuration window (API keys & security), choose a passphrase. Keys are encrypted with AES-256-GCM using a key derived from your passphrase (PBKDF2-SHA256, 600,000 iterations) and stored in the browser's local storage. You enter the passphrase once per visit to unlock them.
+1. **Encrypted storage (recommended).** In the configuration window (API keys & security), choose a passphrase. Keys are encrypted with AES-256-GCM using a key derived from your passphrase (PBKDF2-SHA256, 600,000 iterations) and stored in the browser's local storage. You enter the passphrase once per tab to unlock them: reloading the page keeps them unlocked. For that, the unlocked key is kept in `history.state`, which belongs to this page's entry in the tab's history; other websites and other local files can't read it, even in the same tab, and the key can't be exported, only used. Closing the tab forgets it, and after 12 hours the passphrase is asked again. If your browser reopens tabs after a restart, a reopened tab can still be unlocked within those 12 hours. You can turn this off in API keys & security.
 2. **Memory only.** Enter keys without setting up storage; they are forgotten when you close the page.
 3. **Config file.** Download the template from API keys & security, fill in your keys, and import it each time. For automatic loading, copy `config.template.js` to `config.local.js` (it is git-ignored), fill it in, and enable "Auto-load config.local.js" in the same section. Config files are plain text, so keep them private.
 

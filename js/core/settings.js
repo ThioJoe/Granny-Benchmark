@@ -78,7 +78,7 @@
       audio: { enabled: true, volume: 0.7, music: true },
       graphics: { shadows: true, pixelRatioCap: 1.75, showFps: false },
       camera: { autoDirector: true, invertY: false, sensitivity: 1 },
-      security: { autoLoadConfigFile: false },
+      security: { autoLoadConfigFile: false, stayUnlockedInTab: true },
       ui: { panelOpen: true, tab: 'arena' },
     };
   }
