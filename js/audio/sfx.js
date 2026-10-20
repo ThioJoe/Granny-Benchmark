@@ -30,6 +30,9 @@
       this.master.gain.value = this.enabled ? this.volume : 0;
       this.master.connect(comp);
       comp.connect(c.destination);
+      // Typed-out dialogue blips have their own bus: they follow the voices switch, not the sound effects one.
+      this.voiceBus = c.createGain();
+      this.voiceBus.connect(comp);
       // shared noise buffer
       const len = c.sampleRate * 2;
       const buf = c.createBuffer(1, len, c.sampleRate);
@@ -273,6 +276,24 @@
       const g = c.createGain(); o.connect(g); g.connect(this.master);
       this._env(g, t, 0.001, 0.12, 0.04);
       o.start(t); o.stop(t + 0.06);
+    },
+
+    // One "voice" blip for typed-out dialogue. o: {freq, wave, dur, vol}
+    blip(o) {
+      if (!this.ensure()) return;
+      const c = this.ctx, t = c.currentTime;
+      const osc = c.createOscillator();
+      osc.type = o.wave || 'triangle';
+      osc.frequency.setValueAtTime(o.freq, t);
+      osc.frequency.exponentialRampToValueAtTime(o.freq * 0.88, t + o.dur);
+      const g = c.createGain();
+      if (o.wave === 'square') {
+        const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
+        osc.connect(lp); lp.connect(g);
+      } else osc.connect(g);
+      g.connect(this.voiceBus);
+      this._env(g, t, 0.004, o.vol, o.dur);
+      osc.start(t); osc.stop(t + o.dur + 0.02);
     },
 
     // Virtual tool used: two quick blips.

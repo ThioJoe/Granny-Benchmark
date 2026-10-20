@@ -300,6 +300,9 @@ body:not([data-tab="arena"]) #panel-toggle { display: none; }
 .bubble-text span.said { opacity: 1; }
 .bubble-text span { opacity: 0.55; }
 .bubble-text span.cur { opacity: 1; background: rgba(255, 204, 26, 0.55); border-radius: 3px; box-shadow: 0 0 0 2px rgba(255, 204, 26, 0.55); }
+/* Typed-out lines: the text appears as it is typed; the rest keeps its space so the bubble does not jump. */
+.bubble.typing .bubble-text span, .bubble.typing .bubble-text span.cur { opacity: 1; background: none; box-shadow: none; }
+.bubble.typing .bubble-text span:not(.said):not(.cur) { visibility: hidden; }
 .bubble.docked .bubble-text span.cur, .bubble.narrator .bubble-text span.cur { background: rgba(255, 204, 26, 0.35); }
 .bubble.fading { opacity: 0; }
 

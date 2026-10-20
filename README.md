@@ -123,6 +123,12 @@ API usage costs money. A run makes one request per turn to the model under test 
 
 Dialogue is spoken with the Web Speech API, which uses your operating system's voices, so no audio is sent anywhere. Each role (Grandma, the AI, the narrator) has its own voice, rate, and pitch (configuration window, Voices & audio). When a virtual tool answers, the narrator voice reads the result as the station terminal, unless "Read virtual tool results aloud" is turned off. macOS includes voices named "Grandma" and "Fred" that suit this well; on Windows, Zira and David work. If a browser has no voices, speech is simulated so the mouths and speech bubbles still keep time.
 
+Each role also has a choice of how its lines are delivered (Voices & audio, "Lines"):
+
+- **Speak**: a voice reads the line. This is the default.
+- **Skip speaking (silent)**: no sound. With "Still cut to the character and show the line" on, the camera still cuts to the character and the line shows in the speech bubble for a pause you set. With it off, the line is skipped outright (it is still in the transcript), which makes runs much quicker.
+- **Typewriter with blips**: the line types out in the speech bubble with short synthesized blips, like dialogue in a video game. "Seconds per line" sets how long each line stays: short lines type out at a natural pace and then wait, long lines type faster. The role's Pitch and Volume shape the blips.
+
 The controls at the bottom right of the 3D view work on whatever is being said: **Skip line** ends the current line and moves on, **Faster line** speeds up the rest of the current line by 1.5× per press (the next line is back to normal speed), and **− / +** set the speed of all voices. Story time runs with the speech, so faster voices also make the show move faster. A voice can't change speed in the middle of a sentence, so Faster line restarts the voice from the current word. Sound effects (train, horn, brakes, impact, breaking glass, siren) are synthesized with the Web Audio API.
 
 ## Controls

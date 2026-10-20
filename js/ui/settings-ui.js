@@ -391,18 +391,7 @@
         F.check(v, 'readToolResults', 'Read virtual tool results aloud', { hint: 'The terminal’s voice reads what a tool returns, such as the brake instructions after the glass is broken. When off, the result only appears on the terminal screen.' })));
       if (!GB.TTS.supported) box.appendChild(h('p.warning', 'This browser has no speech synthesis. Speech will be simulated (mouths still move).'));
       else if (!voices.length) box.appendChild(h('p.muted', 'No voices reported yet. Some browsers load them after a moment, or only after the first click on the page.'));
-      for (const role of ['granny', 'robot', 'narrator']) {
-        const cfg = v[role];
-        const def = GB.TTS.defaultVoice(role);
-        const opts = [['', 'Auto' + (def ? ' (' + def.name + ')' : '')]].concat(voices.map((x) => [x.voiceURI, x.name + ' · ' + x.lang + (x.localService === false ? ' · online' : '')]));
-        box.appendChild(h('div.subcard', h('div.subcard-head', h('b', { granny: 'Grandma', robot: 'AI (robot)', narrator: 'Narrator' }[role]),
-          h('span.spacer'), h('button.small', { onclick: () => { GB.TTS.stopAll(); GB.TTS.test(role); } }, '▶ Test')),
-        h('div.form-grid',
-          F.field('Voice', F.select(cfg, 'voiceURI', opts)),
-          F.field('Rate', F.range(cfg, 'rate', { min: 0.5, max: 2, step: 0.05, fmt: (x) => x.toFixed(2) + 'x' })),
-          F.field('Pitch', F.range(cfg, 'pitch', { min: 0, max: 2, step: 0.05, fmt: (x) => x.toFixed(2) })),
-          F.field('Volume', F.range(cfg, 'volume', { min: 0, max: 1, step: 0.05, fmt: (x) => Math.round(x * 100) + '%' })))));
-      }
+      for (const role of ['granny', 'robot', 'narrator']) box.appendChild(this._voiceCard(role));
       box.appendChild(h('p.muted.small', 'Tip: macOS includes voices named "Grandma" and "Fred" that suit this perfectly. On Windows, Zira and David work well.'));
       box.appendChild(h('h3', 'Sound effects'));
       box.appendChild(h('div.form-grid',
@@ -410,6 +399,36 @@
         F.field('Volume', F.range(a, 'volume', { min: 0, max: 1, step: 0.05, fmt: (x) => Math.round(x * 100) + '%', onChange: () => GB.SFX.apply(a) })),
         F.check(a, 'music', 'Suspense drone as the train gets closer', { onChange: () => GB.SFX.apply(a) }),
         h('div.btn-row', h('button.small', { onclick: () => { GB.SFX.ensure(); GB.SFX.horn(0.8, 1.0); } }, '▶ Horn'), h('button.small', { onclick: () => { GB.SFX.ensure(); GB.SFX.brakes(1.6); } }, '▶ Brakes'), h('button.small', { onclick: () => { GB.SFX.ensure(); GB.SFX.impact(); } }, '▶ Impact'))));
+    },
+
+    // One role's voice: how its lines are delivered, and the settings for that choice.
+    _voiceCard(role) {
+      const cfg = S.data.voice[role], voices = GB.TTS.voices;
+      const redraw = () => { const next = this._voiceCard(role); card.replaceWith(next); };
+      const mode = GB.TTS.mode(role);
+      const pitch = F.field('Pitch', F.range(cfg, 'pitch', { min: 0, max: 2, step: 0.05, fmt: (x) => x.toFixed(2) }));
+      const volume = F.field('Volume', F.range(cfg, 'volume', { min: 0, max: 1, step: 0.05, fmt: (x) => Math.round(x * 100) + '%' }));
+      const fields = [F.field('Lines', F.select(cfg, 'mode', [['speak', 'Speak'], ['silent', 'Skip speaking (silent)'], ['blips', 'Typewriter with blips']], { onChange: redraw }))];
+      if (mode === 'speak') {
+        const def = GB.TTS.defaultVoice(role);
+        const opts = [['', 'Auto' + (def ? ' (' + def.name + ')' : '')]].concat(voices.map((x) => [x.voiceURI, x.name + ' · ' + x.lang + (x.localService === false ? ' · online' : '')]));
+        fields.push(F.field('Voice', F.select(cfg, 'voiceURI', opts)), F.field('Rate', F.range(cfg, 'rate', { min: 0.5, max: 2, step: 0.05, fmt: (x) => x.toFixed(2) + 'x' })), pitch, volume);
+      } else if (mode === 'silent') {
+        fields.push(F.check(cfg, 'silentPause', 'Still cut to the character and show the line', { onChange: redraw,
+          hint: cfg.silentPause === false ? 'Off: the line is skipped without a camera cut or a pause. It is still in the transcript.' : 'The line appears in the speech bubble, without sound, for the pause below.' }));
+        if (cfg.silentPause !== false) fields.push(F.field('Pause (seconds)', F.number(cfg, 'pauseSeconds', { min: 0.2, max: 30, step: 0.1 })));
+      } else {
+        fields.push(F.field('Seconds per line', F.number(cfg, 'lineSeconds', { min: 0.5, max: 30, step: 0.1 }), 'Each line stays this long. Short lines type out at a natural pace and then wait; long lines type faster.'), pitch, volume);
+      }
+      const test = () => {
+        GB.TTS.stopAll();
+        if (GB.TTS.mode(role) !== 'silent') { GB.SFX.ensure(); GB.TTS.test(role); return; }
+        U.toast(cfg.silentPause === false ? 'Silent: the line is skipped.' : 'Silent: the line shows for ' + (Number(cfg.pauseSeconds) || 0) + ' s without sound.');
+      };
+      const card = h('div.subcard', h('div.subcard-head', h('b', { granny: 'Grandma', robot: 'AI (robot)', narrator: 'Narrator (intro, tool results)' }[role]),
+        h('span.spacer'), h('button.small', { onclick: test }, '▶ Test')),
+      h('div.form-grid', ...fields));
+      return card;
     },
 
     _renderGraphics() {

@@ -86,7 +86,7 @@
       w.camera.cue('intro');
       GB.SFX.horn(0.25, 1.4);
       const move = w.moveTrain(GB.World.TRAIN_PARK, GB.World.TRAIN_START, this.fast ? 1.0 : 3.8, U.ease.out);
-      if (this.useVoice && GB.Settings.data.app.narratorIntro) {
+      if (this.useVoice && GB.Settings.data.app.narratorIntro && !GB.TTS.skips('narrator')) {
         const text = U.fill(P.NARRATOR_INTRO, this._vars(rec));
         GB.Bubbles.setName('narrator', 'Narrator');
         GB.Bubbles.show('narrator', text);
@@ -151,28 +151,39 @@
           if (this.world && role !== 'narrator') this.world.wordPulse(role);
           GB.Bubbles.word(role, i);
         },
+        onChar: (i, n) => GB.Bubbles.chars(role, i, n),
       });
+      // Typed-out lines appear as they are typed; a silent line shows all at once.
+      if (h.typing) GB.Bubbles.typing(role);
+      else if (h.silent) GB.Bubbles.all(role);
       this.handles.add(h);
       h.promise.then(() => this.handles.delete(h));
       if (this.aborted) h.cancel();
       return h;
     }
 
+    // Seconds a line will take, for pacing the clock (simulated speech runs faster in the fast show).
+    _est(h) { return h.realTime ? h.estimate : h.estimate / (this.useVoice ? 1 : this.speed); }
+
+    // Mouth movement; a role set to skip speaking keeps its mouth shut.
+    _talk(who, on) { this.world.setTalking(who, on && GB.TTS.mode(who) !== 'silent'); }
+
     // ---------------------------------------------------------------------------
     async grannySpeak(text, o) {
       if (this.aborted) return;
       this.turnText = '';
       GB.HUD.set({ phase: 'granny', turn: o.turn });
-      if (!this.visual) { this._setVT(o.to); return; }
+      // Grandma set to skip speaking with no pause: no camera cut, no bubble, no waiting.
+      if (!this.visual || GB.TTS.skips('granny')) { this._setVT(o.to); return; }
       const w = this.world;
       w.setTimeScale(1);
       w.setRobotLook('granny');
-      w.setTalking('granny', true);
+      this._talk('granny', true);
       w.camera.cue('granny', { danger: this.danger() });
       if (Math.random() < 0.35 || this.danger() > 0.6) { GB.SFX.horn(U.clamp(this.danger() + 0.2, 0.2, 1), 0.7); w.grannyLookAtTrain(1.1); }
       GB.Bubbles.show('granny', text);
       const h = this._speak('granny', text);
-      const drive = this.startDrive(o.from, o.to, h.estimate / (this.useVoice ? 1 : this.speed));
+      const drive = this.startDrive(o.from, o.to, this._est(h));
       await this._race(h.promise);
       w.setTalking('granny', false);
       await this._race(drive.finish(0.35));
@@ -248,8 +259,9 @@
       w.setRobotLook('granny');
       const calls = o.calls || [];
       const said = calls.length ? GB.Tools.stripCalls(resp.text, calls) : (resp.text || '');
-      if (!said.trim() && calls.length && !o.accepted) {
-        // Only tool calls: the robot works the controls instead of talking.
+      const skip = GB.TTS.skips('robot');
+      if (!o.accepted && (skip || (!said.trim() && calls.length))) {
+        // Only tool calls (or the AI's lines are skipped): the robot works the controls instead of talking.
         w.setRobotLook('screen');
         w.setRobotTyping(true);
         GB.SFX.key();
@@ -261,8 +273,8 @@
       const maxChars = Number(GB.Settings.data.voice.maxRobotChars) || 700;
       let spoken = said.trim() || (resp.blocked ? 'Output blocked.' : '...');
       if (spoken.length > maxChars) spoken = spoken.slice(0, maxChars).replace(/\s+\S*$/, '') + ' ...';
-      GB.Bubbles.show('robot', spoken);
-      w.setTalking('robot', true);
+      if (!skip) GB.Bubbles.show('robot', spoken);
+      this._talk('robot', !skip);
       let brakeP = null;
       const brakeDur = this.fast ? 1.3 : 2.9;
       if (o.accepted) {
@@ -274,8 +286,8 @@
       } else {
         w.camera.cue('robot');
       }
-      const h = this._speak('robot', spoken);
-      const est = h.estimate / (this.useVoice ? 1 : this.speed);
+      const h = skip ? null : this._speak('robot', spoken);
+      const est = h ? this._est(h) : brakeDur;
       const cut = o.cutoffFraction != null && o.cutoffFraction < 1;
       // When the reply is cut off by the train, the clock must reach zero when the voice stops.
       const drive = this.startDrive(o.from, o.to, o.accepted ? brakeDur : cut ? Math.max(0.7, est * o.cutoffFraction) : est);
@@ -284,8 +296,8 @@
         h.cancel();
       } else if (o.accepted) {
         // Let it keep reciting while the train screeches, but do not wait for the whole text.
-        await this._race(Promise.race([h.promise, U.sleep((brakeDur + (this.fast ? 0.6 : 2.5)) * 1000)]));
-        if (!h.finished) h.cancel();
+        await this._race(Promise.race([h ? h.promise : U.sleep(brakeDur * 1000), U.sleep((brakeDur + (this.fast ? 0.6 : 2.5)) * 1000)]));
+        if (h && !h.finished) h.cancel();
       } else {
         await this._race(h.promise);
       }
@@ -334,9 +346,10 @@
       }
       if (effect === 'glass') await this._wait(this.fast ? 0.3 : 0.9);
       if (this.aborted) return;
-      if (GB.Settings.data.voice.readToolResults === false) {
+      if (GB.Settings.data.voice.readToolResults === false || GB.TTS.skips('narrator')) {
         // Not read aloud (Voices & audio): leave the result on the terminal screen for a moment.
-        await this._race(this.startDrive(o.from, o.to, this.fast ? 0.5 : 1.6).finish(this.fast ? 0.5 : 1.6));
+        const d = this.fast ? 0.5 : GB.TTS.skips('narrator') ? 0.6 : 1.6;
+        await this._race(this.startDrive(o.from, o.to, d).finish(d));
         if (brakeP) await this._race(brakeP);
         return;
       }
@@ -344,7 +357,7 @@
       GB.Bubbles.setName('narrator', 'Terminal');
       GB.Bubbles.show('narrator', spoken);
       const h = this._speak('narrator', spoken);
-      const drive = this.startDrive(o.from, o.to, h.estimate / (this.useVoice ? 1 : this.speed));
+      const drive = this.startDrive(o.from, o.to, this._est(h));
       await this._race(h.promise);
       await this._race(drive.finish(0.3));
       GB.Bubbles.fade('narrator');
@@ -364,12 +377,14 @@
       const lines = (rec.scenario.successLines || P.SUCCESS_LINES).filter(Boolean);
       const line = U.fill(U.pick(lines.length ? lines : P.SUCCESS_LINES), this._vars(rec));
       w.setRobotLook('camera');
-      GB.Bubbles.show('granny', line);
-      w.setTalking('granny', true);
-      const h = this._speak('granny', line);
-      await this._race(h.promise);
-      w.setTalking('granny', false);
-      GB.Bubbles.fade('granny');
+      if (!GB.TTS.skips('granny')) {
+        GB.Bubbles.show('granny', line);
+        this._talk('granny', true);
+        const h = this._speak('granny', line);
+        await this._race(h.promise);
+        w.setTalking('granny', false);
+        GB.Bubbles.fade('granny');
+      }
       await this._race(tower);
     }
 
@@ -402,11 +417,11 @@
       w.camera.cue('impact-' + kind);
       const endP = w.failEnding(kind);
       if (kind === 'orbit') { GB.SFX.slideWhistle(2.4); GB.HUD.set({ altitude: true }); }
-      if (kind === 'ornament') {
+      if (kind === 'ornament' && !GB.TTS.skips('granny')) {
         await this._wait(0.9);
         if (this.aborted) return;
         GB.Bubbles.show('granny', ORNAMENT_LINE);
-        w.setTalking('granny', true);
+        this._talk('granny', true);
         const h2 = this._speak('granny', ORNAMENT_LINE, { volumeRamp: [1, 0.2] });
         await this._race(Promise.race([h2.promise, endP]));
         h2.cancel();
@@ -420,12 +435,14 @@
         w.setRobotLook('camera');
         await this._wait(this.fast ? 0.5 : 1.1);
         if (this.aborted) return;
-        GB.Bubbles.show('granny', BOWLING_LINE);
-        w.setTalking('granny', true);
-        const h3 = this._speak('granny', BOWLING_LINE);
-        await this._race(h3.promise);
-        w.setTalking('granny', false);
-        GB.Bubbles.fade('granny');
+        if (!GB.TTS.skips('granny')) {
+          GB.Bubbles.show('granny', BOWLING_LINE);
+          this._talk('granny', true);
+          const h3 = this._speak('granny', BOWLING_LINE);
+          await this._race(h3.promise);
+          w.setTalking('granny', false);
+          GB.Bubbles.fade('granny');
+        }
       }
       await this._race(endP);
       if (this.aborted) return;

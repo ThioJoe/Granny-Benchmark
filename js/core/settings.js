@@ -69,9 +69,10 @@
         enabled: true,
         speed: 1,                // overall voice speed (Arena control), multiplies each role's rate
         readToolResults: true,   // the terminal's voice reads virtual tool results aloud
-        granny: { voiceURI: '', rate: 0.95, pitch: 1.5, volume: 1 },
-        robot: { voiceURI: '', rate: 1.05, pitch: 0.55, volume: 1 },
-        narrator: { voiceURI: '', rate: 0.95, pitch: 0.8, volume: 1 },
+        // mode: 'speak' | 'silent' (skip speaking; silentPause/pauseSeconds) | 'blips' (typed out; lineSeconds)
+        granny: { mode: 'speak', voiceURI: '', rate: 0.95, pitch: 1.5, volume: 1, silentPause: true, pauseSeconds: 1.5, lineSeconds: 2.5 },
+        robot: { mode: 'speak', voiceURI: '', rate: 1.05, pitch: 0.55, volume: 1, silentPause: true, pauseSeconds: 1.5, lineSeconds: 2.5 },
+        narrator: { mode: 'speak', voiceURI: '', rate: 0.95, pitch: 0.8, volume: 1, silentPause: true, pauseSeconds: 1.5, lineSeconds: 2.5 },
         maxRobotChars: 700,
         subtitles: true,
       },

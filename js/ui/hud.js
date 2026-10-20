@@ -130,15 +130,49 @@
       it.long = it.words.length > 46;
       it.cur = -1;
       this._render(it);
-      it.el.classList.remove('hidden', 'fading');
+      it.el.classList.remove('hidden', 'fading', 'typing');
       it.el.classList.toggle('long', it.long);
+      it.typing = false;
+      it.partial = null;
       it.visible = true;
       this.frame();   // place it now, not where it was last time
+    },
+
+    // A typed-out line (Voices & audio): words appear as they are typed instead of being highlighted.
+    typing(who) {
+      const it = this.items[who];
+      if (!it) return;
+      it.typing = true;
+      it.cur = -1;
+      it.el.classList.add('typing');
+      this._render(it);
+    },
+
+    // Typing: word i shows its first n characters (the words before it are complete).
+    chars(who, i, n) {
+      const it = this.items[who];
+      if (!it || !it.visible || !it.typing) return;
+      if (i !== it.cur) this.word(who, i);
+      const s = it.spans[i];
+      if (!s) return;
+      const ch = Array.from(it.words[i]);
+      U.clear(s);
+      s.appendChild(document.createTextNode(ch.slice(0, n).join('')));
+      if (n < ch.length) s.appendChild(h('span.rest', ch.slice(n).join('')));
+      s.appendChild(document.createTextNode(' '));
+      it.partial = n < ch.length ? i : null;
+    },
+
+    // The whole line at once (a silent line that pauses on screen).
+    all(who) {
+      const it = this.items[who];
+      if (it && it.visible) this.word(who, it.words.length);
     },
 
     _render(it) {
       U.clear(it.text);
       it.spans = [];
+      it.partial = null;
       let from = 0, to = it.words.length;
       if (it.long) {
         const c = Math.max(0, it.cur);
@@ -160,6 +194,8 @@
     word(who, i) {
       const it = this.items[who];
       if (!it || !it.visible) return;
+      // A word left half typed (typing skipped ahead) is shown whole again.
+      if (it.partial != null && it.partial !== i && it.spans[it.partial]) { it.spans[it.partial].textContent = it.words[it.partial] + ' '; it.partial = null; }
       const prev = it.cur;
       it.cur = i;
       if (it.long && (i >= it.to - 6 || i < it.from)) { this._render(it); return; }

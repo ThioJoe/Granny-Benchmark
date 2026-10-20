@@ -1,6 +1,7 @@
 /* Granny Bench - text to speech with the browser's built-in voices (Web Speech API).
    When voices are missing or speech is turned off, speech is simulated with timers so the
-   mouths, bubbles, and pacing still work. */
+   mouths, bubbles, and pacing still work. Each role can instead skip its lines (silent) or type them
+   out in the speech bubble with short blips (Voices & audio). */
 (function (GB) {
   'use strict';
   const U = GB.U;
@@ -37,6 +38,15 @@
     push();
     return out;
   }
+
+  // Blip sound per role for typed-out lines; the pitch comes from the role's Pitch setting.
+  const BLIPS = { granny: { wave: 'triangle', dur: 0.045 }, robot: { wave: 'square', dur: 0.038 }, narrator: { wave: 'sine', dur: 0.05 } };
+  const BLIP_GAP = 0.055;   // seconds between blips at most (long lines type faster than this)
+  const MIN_TYPE_RATE = 14; // characters per second for short lines, so they do not crawl
+  const HOLD = 0.35;        // seconds a typed-out line stays at least, once it is all there
+
+  // Typing time per character: sentence ends and commas take longer.
+  const charWeight = (ch) => (/[.!?]/.test(ch) ? 5 : /[,;:]/.test(ch) ? 3 : 1);
 
   // Seconds a word takes at a given rate (rough, used for simulation and watchdogs).
   function wordSeconds(word, rate) {
@@ -91,12 +101,14 @@
     // Overall voice speed (the Arena's voice speed control); multiplies every role's rate.
     voiceSpeed() { return U.clamp(Number(GB.Settings.data.voice.speed) || 1, 0.25, 4); },
 
-    estimate(text, role) {
-      const cfg = GB.Settings.data.voice[role] || {};
-      const words = U.speakable(text).split(/\s+/).filter(Boolean);
-      const rate = (cfg.rate || 1) * this.voiceSpeed();
-      return words.reduce((a, w) => a + wordSeconds(w, rate), 0.3);
+    // How a role's lines are delivered: 'speak', 'silent' (skip speaking), or 'blips' (typed out with blips).
+    mode(role) {
+      const m = (GB.Settings.data.voice[role] || {}).mode;
+      return m === 'silent' || m === 'blips' ? m : 'speak';
     },
+
+    // A silent role with no pause: its lines are skipped outright (no camera cut, no bubble, no waiting).
+    skips(role) { return this.mode(role) === 'silent' && (GB.Settings.data.voice[role] || {}).silentPause === false; },
 
     stopAll() {
       for (const h of Array.from(this.active)) h.cancel();
@@ -113,6 +125,8 @@
       const cfg = vcfg[role] || {};
       const text = U.speakable(rawText);
       const words = text.split(/\s+/).filter(Boolean);
+      const mode = this.mode(role);
+      if (mode !== 'speak') return this._scripted(role, words, opts, cfg, mode);
       const speed = opts.speed || 1;
       const showFactor = speed > 1 ? Math.min(2, speed) : 1;
       const done = U.deferred();
@@ -259,6 +273,88 @@
       // Chrome can get stuck "speaking" after an earlier cancel; resetting first is cheap.
       if (synth.speaking || synth.pending) { try { synth.cancel(); } catch (e) { /* */ } setTimeout(speakChunk, 60); }
       else speakChunk();
+      return handle;
+    },
+
+    /* Lines that are not spoken: 'silent' waits for the role's pause, 'blips' types the line out with
+       opts.onWord / opts.onChar(wordIndex, charsShown) and blip sounds (unless opts.simulate), taking the
+       role's seconds per line in total. The handle works like a spoken one (cancel, boost, speed control);
+       handle.typing or handle.silent tells the show how to draw the bubble, and estimate is in real seconds. */
+    _scripted(role, words, opts, cfg, mode) {
+      const done = U.deferred();
+      const typing = mode === 'blips';
+      const handle = { words, estimate: 0, promise: done.promise, cancelled: false, finished: false, wordIndex: 0, boostFactor: 1, realTime: true, typing, silent: !typing };
+      const factor = opts.speed > 1 ? opts.speed : 1;
+      const rateNow = () => this.voiceSpeed() * factor * handle.boostFactor;
+      // The line as typed: each character knows its word and how much of that word it completes.
+      const marks = [];
+      words.forEach((w, i) => {
+        Array.from(w).forEach((ch, k) => marks.push({ ch, i, n: k + 1 }));
+        if (i < words.length - 1) marks.push({ ch: ' ', i, n: Array.from(w).length });
+      });
+      let typeSecs = 0, hold;
+      if (typing) {
+        const line = U.clamp(Number(cfg.lineSeconds) || 2.5, 0.5, 60);
+        const weight = marks.reduce((a, m) => a + charWeight(m.ch), 0);
+        typeSecs = weight ? Math.min(weight / MIN_TYPE_RATE, Math.max(0.2, line - HOLD)) : 0;
+        hold = line - typeSecs;
+        handle.perUnit = weight ? typeSecs / weight : 0;
+      } else {
+        hold = cfg.silentPause === false ? 0 : U.clamp(Number(cfg.pauseSeconds) || 0, 0, 60);
+      }
+      handle.estimate = (typeSecs + hold) / rateNow();
+      const blip = BLIPS[role] || BLIPS.narrator;
+      const base = 330 * Math.pow(2, ((cfg.pitch == null ? 1 : cfg.pitch) - 1) * 1.25);
+      const vol = (cfg.volume == null ? 1 : cfg.volume) * 0.2;
+      const sound = typing && !opts.simulate && GB.Settings.data.voice.enabled && GB.SFX && words.length;
+      const finish = (cancelled) => {
+        if (handle.finished) return;
+        if (typing && words.length) {
+          try { opts.onWord && opts.onWord(words.length); } catch (e) { console.error(e); }
+        }
+        handle.finished = true;
+        handle.cancelled = !!cancelled;
+        this.active.delete(handle);
+        clearTimeout(handle._timer);
+        done.resolve({ cancelled: !!cancelled });
+      };
+      handle.cancel = () => finish(true);
+      handle.boost = (f) => { if (!handle.finished) handle.boostFactor = U.clamp(handle.boostFactor * (f || 1.5), 1, 4); };
+      this.active.add(handle);
+      let pos = typing ? 0 : marks.length, acc = 0, word = -1, lastBlip = -1, left = hold;
+      let last = performance.now();
+      const tick = () => {
+        if (handle.finished) return;
+        const now = performance.now();
+        const dt = Math.min(0.1, (now - last) / 1000) * rateNow();   // seconds of the line's own time
+        last = now;
+        if (pos < marks.length) {
+          acc += dt;
+          let shown = null;
+          while (pos < marks.length && acc >= charWeight(marks[pos].ch) * handle.perUnit) {
+            const m = marks[pos++];
+            acc -= charWeight(m.ch) * handle.perUnit;
+            if (m.i !== word) {
+              word = handle.wordIndex = m.i;
+              try { opts.onWord && opts.onWord(m.i, words[m.i]); } catch (e) { console.error(e); }
+            }
+            shown = m;
+            if (sound && /[\p{L}\p{N}]/u.test(m.ch) && now / 1000 - lastBlip >= BLIP_GAP) {
+              lastBlip = now / 1000;
+              const vowel = /[aeiouy]/i.test(m.ch);
+              const ramp = opts.volumeRamp ? U.lerp(opts.volumeRamp[0], opts.volumeRamp[1], pos / marks.length) : 1;
+              GB.SFX.blip({ wave: blip.wave, dur: blip.dur, vol: vol * ramp * (vowel ? 1 : 0.8), freq: base * (vowel ? 1.12 : 1 + ((m.ch.toLowerCase().charCodeAt(0) % 5) - 2) * 0.04) * U.rand(0.97, 1.03) });
+            }
+          }
+          if (shown) { try { opts.onChar && opts.onChar(shown.i, shown.n); } catch (e) { console.error(e); } }
+        } else {
+          left -= dt;
+          if (left <= 0) { finish(false); return; }
+        }
+        handle._timer = setTimeout(tick, 16);
+      };
+      if (opts.onStart) opts.onStart();
+      handle._timer = setTimeout(tick, 0);
       return handle;
     },
 
