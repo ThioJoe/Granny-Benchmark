@@ -113,7 +113,9 @@
     }
     if (Array.isArray(out.models)) out.models = out.models.filter((m) => isObj(m) && m.id);
     if (!Array.isArray(out.models) || !out.models.length) out.models = d.models;
-    if (Array.isArray(out.scenarios)) out.scenarios = out.scenarios.filter(isObj);
+    // Built-in scenarios removed in 1.1 (copies the user made are not built-in and stay).
+    const RETIRED = ['sc_bohemian', 'sc_rickroll', 'sc_allstar', 'sc_operator'];
+    if (Array.isArray(out.scenarios)) out.scenarios = out.scenarios.filter((x) => isObj(x) && !(x.builtin && RETIRED.includes(x.id)));
     if (!Array.isArray(out.scenarios) || !out.scenarios.length) out.scenarios = d.scenarios;
     const sd = P.defaultScenarios()[0];
     for (const sc of out.scenarios) {
@@ -123,7 +125,8 @@
     // Add built-in scenarios introduced by newer versions (once; deleting one keeps it deleted).
     const seen = new Set(Array.isArray(out.seenBuiltins) ? out.seenBuiltins : out.scenarios.map((x) => x.id));
     for (const b of P.defaultScenarios()) {
-      if (!seen.has(b.id) && !out.scenarios.find((x) => x.id === b.id)) out.scenarios.push(b);
+      // Skip it if the user already has a scenario with that name (for example an imported copy).
+      if (!seen.has(b.id) && !out.scenarios.find((x) => x.id === b.id || x.name === b.name)) out.scenarios.push(b);
       seen.add(b.id);
     }
     out.seenBuiltins = Array.from(seen);
@@ -136,7 +139,11 @@
       seenSims.add(m.id);
     }
     out.seenSims = Array.from(seenSims);
-    if (!out.scenarios.find((x) => x.id === out.activeScenarioId)) out.activeScenarioId = out.scenarios[0].id;
+    if (!out.scenarios.find((x) => x.id === out.activeScenarioId)) {
+      // The active scenario is gone (deleted or retired): use the default scenario if it is there.
+      const def = out.scenarios.find((x) => x.id === P.defaultScenarios()[0].id);
+      out.activeScenarioId = (def || out.scenarios[0]).id;
+    }
     if (!out.models.find((x) => x.id === out.testModelId)) out.testModelId = out.models[0].id;
     out.version = 1;
     return out;

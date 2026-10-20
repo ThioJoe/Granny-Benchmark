@@ -372,6 +372,9 @@ body.running #cam-controls .hint { display: none; }
 .sc-pick { width: auto; min-width: 240px; max-width: 100%; flex: 1; }
 .sc-editor textarea.input { font-size: 13px; }
 .tool-card .subcard-head { margin-bottom: 6px; }
+.export-group { border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px 6px; margin: 10px 0; background: var(--card-2); }
+.export-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.export-group .muted.small { margin: 2px 0 4px; }
 .sim-toggle { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-2); margin-bottom: 8px; }
 .model-list.dim { opacity: 0.55; }
 .tool-card.off { opacity: 0.6; }

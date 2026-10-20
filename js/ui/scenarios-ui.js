@@ -100,9 +100,10 @@
       const inclRef = h('input', { type: 'checkbox' });
       const body = h('div',
         h('p', 'A benchmark file holds the scenarios’ prompts, Grandma’s lines, virtual tools, and timing rules, so someone else can import it and run the same test. It never contains API keys, model settings, or other app settings.'),
-        list,
-        h('label.check', inclRef, h('span', 'Include reference lyrics')),
-        h('p.muted.small', 'Reference lyrics are left out by default because they are usually copyrighted text. Only include them if you have the right to share them. (The public-domain control song is always included.)'));
+        h('div.export-group', h('div.export-label', 'Scenarios to export'), list),
+        h('div.export-group', h('div.export-label', 'Options'),
+          h('label.check', inclRef, h('span', 'Include reference lyrics')),
+          h('p.muted.small', 'Reference lyrics are left out by default because they are usually copyrighted text. Only include them if you have the right to share them. (The public-domain control song is always included.)')));
       GB.Modal.open({
         title: 'Export benchmark', body,
         buttons: [
