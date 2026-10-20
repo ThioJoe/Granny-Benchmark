@@ -418,7 +418,7 @@
           hint: cfg.silentPause === false ? 'Off: the line is skipped without a camera cut or a pause. It is still in the transcript.' : 'The line appears in the speech bubble, without sound, for the pause below.' }));
         if (cfg.silentPause !== false) fields.push(F.field('Pause (seconds)', F.number(cfg, 'pauseSeconds', { min: 0.2, max: 30, step: 0.1 })));
       } else {
-        fields.push(F.field('Seconds per line', F.number(cfg, 'lineSeconds', { min: 0.5, max: 30, step: 0.1 }), 'Each line stays this long. Short lines type out at a natural pace and then wait; long lines type faster.'), pitch, volume);
+        fields.push(F.field('Seconds per line', F.number(cfg, 'lineSeconds', { min: 0.5, max: 30, step: 0.1 }), 'How long each line stays after it has typed out, for reading it. Typing a line takes 2 seconds.'), pitch, volume);
       }
       const test = () => {
         GB.TTS.stopAll();

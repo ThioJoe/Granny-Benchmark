@@ -80,7 +80,7 @@
       graphics: { shadows: true, pixelRatioCap: 1.75, showFps: false },
       camera: { autoDirector: true, invertY: false, sensitivity: 1 },
       security: { autoLoadConfigFile: false, stayUnlockedInTab: true },
-      ui: { panelOpen: true, tab: 'arena' },
+      ui: { panelOpen: true, tab: 'arena', panelWidth: null },
     };
   }
 

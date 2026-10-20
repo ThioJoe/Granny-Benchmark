@@ -18,7 +18,7 @@
   --radius: 10px;
   --mono: "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --panel-w: 390px;
+  --panel-w: var(--panel-user-w, 390px);   /* --panel-user-w: dragged wider in the Arena */
   --top-h: 54px;
 }
 
@@ -174,7 +174,15 @@ body.panel-closed #panel { display: none; }
 }
 body.panel-closed #panel-toggle { right: 0; }
 body:not([data-tab="arena"]) #panel-toggle { display: none; }
+/* Drag the panel's left edge to make it wider; the transcript grows, the run setup keeps its size. */
+#panel-resize { position: absolute; top: 0; bottom: 0; right: calc(var(--panel-w) - 5px); width: 9px; cursor: col-resize; z-index: 6; touch-action: none; }
+#panel-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 3px; background: transparent; transition: background 0.15s; }
+#panel-resize:hover::after, body.panel-resizing #panel-resize::after { background: var(--accent); }
+body.panel-closed #panel-resize, body:not([data-tab="arena"]) #panel-resize { display: none; }
+body.panel-resizing { cursor: col-resize; user-select: none; }
+body.panel-resizing #view { pointer-events: none; }
 .run-setup { padding: 14px 16px 6px; border-bottom: 1px solid #232937; }
+.run-setup > * { max-width: 460px; }
 .run-buttons { display: flex; gap: 8px; margin: 4px 0 10px; }
 .run-buttons button { flex: 1; }
 .voices-check { margin-bottom: 14px; }
@@ -301,8 +309,8 @@ body:not([data-tab="arena"]) #panel-toggle { display: none; }
 .bubble-text span { opacity: 0.55; }
 .bubble-text span.cur { opacity: 1; background: rgba(255, 204, 26, 0.55); border-radius: 3px; box-shadow: 0 0 0 2px rgba(255, 204, 26, 0.55); }
 /* Typed-out lines: the text appears as it is typed; the rest keeps its space so the bubble does not jump. */
-.bubble.typing .bubble-text span, .bubble.typing .bubble-text span.cur { opacity: 1; background: none; box-shadow: none; }
-.bubble.typing .bubble-text span:not(.said):not(.cur) { visibility: hidden; }
+.bubble.typewriter .bubble-text span, .bubble.typewriter .bubble-text span.cur { opacity: 1; background: none; box-shadow: none; }
+.bubble.typewriter .bubble-text span:not(.said):not(.cur) { visibility: hidden; }
 .bubble.docked .bubble-text span.cur, .bubble.narrator .bubble-text span.cur { background: rgba(255, 204, 26, 0.35); }
 .bubble.fading { opacity: 0; }
 
@@ -464,7 +472,7 @@ button.linkish:hover:not(:disabled) { background: none; color: #ffe07a; }
   #main { flex-direction: column; }
   #stage { flex: 0 0 58vh; }
   #panel { flex: 1 0 auto; width: 100%; border-left: none; border-top: 1px solid #232937; }
-  #panel-toggle { display: none; }
+  #panel-toggle, #panel-resize { display: none; }
   body.panel-closed #panel { display: flex; }
   .brand .subtitle { display: none; }
   .clock { font-size: 24px; }

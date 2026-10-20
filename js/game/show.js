@@ -289,10 +289,13 @@
       const h = skip ? null : this._speak('robot', spoken);
       const est = h ? this._est(h) : brakeDur;
       const cut = o.cutoffFraction != null && o.cutoffFraction < 1;
-      // When the reply is cut off by the train, the clock must reach zero when the voice stops.
-      const drive = this.startDrive(o.from, o.to, o.accepted ? brakeDur : cut ? Math.max(0.7, est * o.cutoffFraction) : est);
+      // When the reply is cut off by the train, the clock must reach zero when the voice stops
+      // (a typed-out reply stops typing there and keeps what it typed).
+      const cutAt = cut ? Math.max(0.7, (h.typing ? h.typeEstimate : est) * o.cutoffFraction) : 0;
+      const drive = this.startDrive(o.from, o.to, o.accepted ? brakeDur : cut ? cutAt : est);
       if (cut) {
-        await this._race(Promise.race([h.promise, U.sleep(Math.max(0.7, est * o.cutoffFraction) * 1000)]));
+        await this._race(Promise.race([h.promise, U.sleep(cutAt * 1000)]));
+        h.cutOff = true;
         h.cancel();
       } else if (o.accepted) {
         // Let it keep reciting while the train screeches, but do not wait for the whole text.

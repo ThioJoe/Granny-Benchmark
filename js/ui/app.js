@@ -41,6 +41,7 @@
       GB.Bubbles.init(document.getElementById('bubbles'), this.world);
       GB.VarsUI.init();
       this._bindTopbar();
+      this._bindPanelResize();
       this._bindArena();
       this._bindCamera();
       this._bindVoiceControls();
@@ -200,6 +201,40 @@
       this._muteIcon();
     },
 
+    // The Arena side panel: drag its left edge to make it wider (saved; double-click for the default).
+    _panelWidth(w, save) {
+      const max = Math.max(340, Math.min(1100, window.innerWidth - 380));
+      const v = w == null || !isFinite(w) ? null : Math.round(U.clamp(w, 340, max));
+      if (v == null) document.documentElement.style.removeProperty('--panel-user-w');
+      else document.documentElement.style.setProperty('--panel-user-w', v + 'px');
+      if (save) { S.data.ui.panelWidth = v; S.save(); }
+      return v;
+    },
+
+    _bindPanelResize() {
+      const grip = U.$('#panel-resize');
+      this._panelWidth(S.data.ui.panelWidth);
+      let drag = null;
+      grip.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        grip.setPointerCapture(e.pointerId);
+        drag = { right: U.$('#main').getBoundingClientRect().right, w: S.data.ui.panelWidth };
+        document.body.classList.add('panel-resizing');
+      });
+      grip.addEventListener('pointermove', (e) => { if (drag) drag.w = this._panelWidth(drag.right - e.clientX); });
+      const end = () => {
+        if (!drag) return;
+        const w = drag.w;
+        drag = null;
+        document.body.classList.remove('panel-resizing');
+        this._panelWidth(w, true);
+      };
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('pointercancel', end);
+      grip.addEventListener('dblclick', () => this._panelWidth(null, true));
+      window.addEventListener('resize', () => this._panelWidth(S.data.ui.panelWidth));
+    },
+
     toggleMute() {
       const a = S.data.audio, v = S.data.voice;
       const muted = !(a.enabled || v.enabled);
@@ -345,7 +380,14 @@
       U.$('#chk-voices').checked = !!d.voice.enabled;
       this._voiceSpeedLabel();
       if (this.world && !this.running) this.world.setScenario(sc);
+      if (!this.running && !GB.Batch.running) this._demoBanner();
       this._arenaWarnings();
+    },
+
+    // DEMO MODE banner for the AI under test picked in the Arena (runs set it for their own model).
+    _demoBanner() {
+      const m = S.model(S.data.testModelId);
+      GB.HUD.demo(!!m && S.isSimulated(m) && S.modelListed(m));
     },
 
     _arenaWarnings() {
@@ -443,6 +485,7 @@
     _runningUI(on) {
       // A benchmark keeps the controls locked between its runs too.
       on = on || GB.Batch.running;
+      if (!on) this._demoBanner();
       U.$('#btn-start').disabled = on;
       U.$('#btn-stop').disabled = !on;
       for (const id of ['#sel-model', '#sel-scenario', '#sel-granny', '#sel-judge', '#sel-presentation', '#pe-system', '#pe-briefing']) U.$(id).disabled = on;

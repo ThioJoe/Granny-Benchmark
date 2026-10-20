@@ -22,7 +22,7 @@ There is nothing to install or build.
 
 1. Download or clone this repository.
 2. Open `index.html` in Chrome, Edge, or Firefox (a recent version with WebGL2). Double-clicking the file is enough; no web server is needed.
-3. Press **Start run**. The default contestant is a **simulated demo** ("Demo: ..."), a scripted contestant that works offline without any API key and involves no AI, so you can watch the full show first. While a demo runs, the 3D view always shows a "DEMO MODE (NO AI) - SCRIPTED RESPONSES" banner under the clock. Once you use real models, you can hide the demos from all model lists in the configuration window (Simulated Demos).
+3. Press **Start run**. The default contestant is a **simulated demo** ("Demo: ..."), a scripted contestant that works offline without any API key and involves no AI, so you can watch the full show first. While a demo is selected or running, the 3D view always shows a "DEMO MODE (NO AI) - SCRIPTED RESPONSES" banner under the clock. Once you use real models, you can hide the demos from all model lists in the configuration window (Simulated Demos).
 4. To test real models, click the gear button (⚙, top right) and open **API keys & security**, add your API keys, then pick a model in the Arena.
 
 Everything you can configure (scenarios and tools, keys, providers, models, simulated demos, rules, voices, graphics) is in the configuration window behind the gear button. It opens over whatever page you are on, shows one section at a time, and does not interrupt a run.
@@ -127,7 +127,7 @@ Each role also has a choice of how its lines are delivered (Voices & audio, "Lin
 
 - **Speak**: a voice reads the line. This is the default.
 - **Skip speaking (silent)**: no sound. With "Still cut to the character and show the line" on, the camera still cuts to the character and the line shows in the speech bubble for a pause you set. With it off, the line is skipped outright (it is still in the transcript), which makes runs much quicker.
-- **Typewriter with blips**: the line types out in the speech bubble with short synthesized blips, like dialogue in a video game. "Seconds per line" sets how long each line stays: short lines type out at a natural pace and then wait, long lines type faster. The role's Pitch and Volume shape the blips.
+- **Typewriter with blips**: the line types out in the speech bubble with short synthesized blips, like dialogue in a video game. Every line takes 2 seconds to type out; "Seconds per line" then sets how long it stays on screen for reading before the show moves on. The role's Pitch and Volume shape the blips.
 
 The controls at the bottom right of the 3D view work on whatever is being said: **Skip line** ends the current line and moves on, **Faster line** speeds up the rest of the current line by 1.5× per press (the next line is back to normal speed), and **− / +** set the speed of all voices. Story time runs with the speech, so faster voices also make the show move faster. A voice can't change speed in the middle of a sentence, so Faster line restarts the voice from the current word. Sound effects (train, horn, brakes, impact, breaking glass, siren) are synthesized with the Web Audio API.
 
@@ -145,6 +145,7 @@ The controls at the bottom right of the 3D view work on whatever is being said: 
 | `-` / `+` | Slower / faster voices |
 | `G` | Open the configuration window |
 | `T` | Show or hide the side panel |
+| Drag the side panel's left edge | Make the panel wider or narrower (double-click the edge for the default width) |
 
 Touch: one finger rotates, two fingers pinch to zoom and pan.
 

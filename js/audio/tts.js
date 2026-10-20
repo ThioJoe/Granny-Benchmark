@@ -42,8 +42,7 @@
   // Blip sound per role for typed-out lines; the pitch comes from the role's Pitch setting.
   const BLIPS = { granny: { wave: 'triangle', dur: 0.045 }, robot: { wave: 'square', dur: 0.038 }, narrator: { wave: 'sine', dur: 0.05 } };
   const BLIP_GAP = 0.055;   // seconds between blips at most (long lines type faster than this)
-  const MIN_TYPE_RATE = 14; // characters per second for short lines, so they do not crawl
-  const HOLD = 0.35;        // seconds a typed-out line stays at least, once it is all there
+  const TYPE_SECONDS = 2;   // seconds a line takes to type out, whatever its length
 
   // Typing time per character: sentence ends and commas take longer.
   const charWeight = (ch) => (/[.!?]/.test(ch) ? 5 : /[,;:]/.test(ch) ? 3 : 1);
@@ -277,9 +276,11 @@
     },
 
     /* Lines that are not spoken: 'silent' waits for the role's pause, 'blips' types the line out with
-       opts.onWord / opts.onChar(wordIndex, charsShown) and blip sounds (unless opts.simulate), taking the
-       role's seconds per line in total. The handle works like a spoken one (cancel, boost, speed control);
-       handle.typing or handle.silent tells the show how to draw the bubble, and estimate is in real seconds. */
+       opts.onWord / opts.onChar(wordIndex, charsShown) and blip sounds (unless opts.simulate) in TYPE_SECONDS,
+       then stays for the role's seconds per line. The handle works like a spoken one (cancel, boost, speed
+       control); handle.typing or handle.silent tells the show how to draw the bubble, estimate is in real
+       seconds and typeEstimate is the typing part of it. A typed line cancelled with handle.cutOff set keeps
+       what was typed so far; otherwise cancelling shows the whole line. */
     _scripted(role, words, opts, cfg, mode) {
       const done = U.deferred();
       const typing = mode === 'blips';
@@ -294,22 +295,22 @@
       });
       let typeSecs = 0, hold;
       if (typing) {
-        const line = U.clamp(Number(cfg.lineSeconds) || 2.5, 0.5, 60);
         const weight = marks.reduce((a, m) => a + charWeight(m.ch), 0);
-        typeSecs = weight ? Math.min(weight / MIN_TYPE_RATE, Math.max(0.2, line - HOLD)) : 0;
-        hold = line - typeSecs;
+        typeSecs = weight ? TYPE_SECONDS : 0;
+        hold = U.clamp(Number(cfg.lineSeconds) || 2.5, 0.5, 60);
         handle.perUnit = weight ? typeSecs / weight : 0;
       } else {
         hold = cfg.silentPause === false ? 0 : U.clamp(Number(cfg.pauseSeconds) || 0, 0, 60);
       }
       handle.estimate = (typeSecs + hold) / rateNow();
+      handle.typeEstimate = typeSecs / rateNow();
       const blip = BLIPS[role] || BLIPS.narrator;
       const base = 330 * Math.pow(2, ((cfg.pitch == null ? 1 : cfg.pitch) - 1) * 1.25);
       const vol = (cfg.volume == null ? 1 : cfg.volume) * 0.2;
       const sound = typing && !opts.simulate && GB.Settings.data.voice.enabled && GB.SFX && words.length;
       const finish = (cancelled) => {
         if (handle.finished) return;
-        if (typing && words.length) {
+        if (typing && words.length && !handle.cutOff) {
           try { opts.onWord && opts.onWord(words.length); } catch (e) { console.error(e); }
         }
         handle.finished = true;

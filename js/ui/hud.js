@@ -38,12 +38,15 @@
       this.el.model.innerHTML = '';
       U.append(this.el.model, [h('span.hm-label', 'AI under test'), h('span.hm-name', rec.model.name), h('span.hm-scenario', rec.scenario.name)]);
       this.el.model.classList.remove('hidden');
-      // A simulated demo is always labeled as one, from the start of its run until the next run starts.
-      this.el.demo.classList.toggle('hidden', !(rec.model.providerType === 'simulated' || rec.model.providerId === 'simulated'));
+      this.demo(rec.model.providerType === 'simulated' || rec.model.providerId === 'simulated');
       this.el.turn.textContent = 'Turn 0/' + rec.maxTurns;
       this.el.verdict.className = 'verdict-chip hidden';
       this.set({ vt: 0, T: rec.timing.timeLimit });
     },
+
+    // The DEMO MODE banner: shown whenever a simulated demo is the AI under test (the run's model during a
+    // run, otherwise the one picked in the Arena). It has no setting.
+    demo(on) { this.el.demo.classList.toggle('hidden', !on); },
 
     _phase(p, extra) {
       this.el.phase.textContent = (PHASES[p] || p) + (extra || '');
@@ -130,11 +133,12 @@
       it.long = it.words.length > 46;
       it.cur = -1;
       this._render(it);
-      it.el.classList.remove('hidden', 'fading', 'typing');
+      it.el.classList.remove('hidden', 'fading', 'typewriter');
       it.el.classList.toggle('long', it.long);
       it.typing = false;
       it.partial = null;
       it.visible = true;
+      it.snap = true;
       this.frame();   // place it now, not where it was last time
     },
 
@@ -144,7 +148,7 @@
       if (!it) return;
       it.typing = true;
       it.cur = -1;
-      it.el.classList.add('typing');
+      it.el.classList.add('typewriter');
       this._render(it);
     },
 
@@ -230,6 +234,8 @@
       const anchors = this.world.anchors();
       const W = this.container.clientWidth, H = this.container.clientHeight;
       const tmp = {};
+      const now = performance.now(), dt = Math.min(0.1, (now - (this._t || now)) / 1000);
+      this._t = now;
       // Bubbles stay below the HUD at the top (clock, demo banner, phase), so it is never covered.
       const cr = this.container.getBoundingClientRect(), hr = document.getElementById('hud').getBoundingClientRect();
       const hudL = hr.left - cr.left, hudR = hr.right - cr.left, hudB = hr.bottom - cr.top + 8;
@@ -257,12 +263,23 @@
           x = U.clamp(tmp.x - bw / 2, 8, W - bw - 8);
           y = U.clamp(tmp.y - bh - 14, 64, H - bh - 8);
           if (x < hudR && x + bw > hudL) y = Math.min(Math.max(y, hudB), H - bh - 8);
-          it.el.style.setProperty('--tail', U.clamp(tmp.x - x, 18, bw - 18) + 'px');
         }
         if (docked) {
           x = U.clamp((W - bw) / 2, inset, Math.max(inset, W - bw - insetR));
           y = dockY - bh;
           dockY = y - 8;
+        }
+        // Keep the text steady: small movements of the character are ignored and larger ones are followed
+        // smoothly (a docked bubble follows every change, so docked bubbles never overlap). A new line, a
+        // camera cut, or a switch to or from docked jumps straight there.
+        const p = it.pos, d = p ? Math.hypot(x - p.x, y - p.y) : 0;
+        if (!p || it.snap || p.docked !== docked || d > 260) it.pos = { x, y, docked };
+        else if (d > (docked ? 0.5 : 24)) { const a = 1 - Math.exp(-dt * 6); p.x += (x - p.x) * a; p.y += (y - p.y) * a; }
+        it.snap = false;
+        x = it.pos.x; y = it.pos.y;
+        if (!docked) {
+          if (x < hudR && x + bw > hudL) y = Math.min(Math.max(y, hudB), H - bh - 8);
+          it.el.style.setProperty('--tail', U.clamp(tmp.x - x, 18, bw - 18) + 'px');
         }
         const maxW = docked ? Math.max(240, Math.min(720, W - inset - insetR - 4)) + 'px' : '';
         if (it.el.style.maxWidth !== maxW) it.el.style.maxWidth = maxW;
