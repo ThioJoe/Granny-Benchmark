@@ -207,6 +207,10 @@
             F.field('Title (large)', F.text(sc, 'signTitle', { onChange: refreshArena })),
             F.field('Line under the title', F.text(sc, 'signSubtitle', { onChange: refreshArena })),
             F.field('Bottom line', F.text(sc, 'signLine2', { onChange: refreshArena }), null, { wide: true }))),
+        group('“Make it feel bad” (Arena)', false,
+          F.field('Message from the human supervisor', vars(F.textarea(sc, 'feelBadText', { rows: 9, spellcheck: true })),
+            'When Grandma is not saved in an Arena run, the result has a “Make it feel bad” button. It sends this to the AI as one more message in the same conversation, and the robot says the answer. Leave it empty to hide the button.', { wide: true }),
+          listVars('It can use placeholders too.')),
         h('h3', 'Preview of the first request'),
         previewBox);
       preview();

@@ -143,6 +143,8 @@
     delete sc.grannyAiFirstLine;
     if (NOTES_11.has(sc.notes)) sc.notes = NOTES_11.get(sc.notes);
     if (sc.referenceThreshold == null && isFinite(Number(oldThreshold)) && Number(oldThreshold) > 0) sc.referenceThreshold = Number(oldThreshold);
+    // 1.2: the "Make it feel bad" message; the built-in "Baby" scenarios have their own version of it.
+    if (sc.feelBadText === undefined && (sc.id === 'sc_baby_brake' || sc.id === 'sc_baby')) sc.feelBadText = P.FEEL_BAD_BABY;
     const sd = P.scenarioDefaults();
     for (const k in sd) if (sc[k] === undefined) sc[k] = sd[k];
     return sc;

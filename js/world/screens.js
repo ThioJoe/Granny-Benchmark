@@ -72,7 +72,7 @@
       c.textBaseline = 'middle';
       c.fillStyle = '#8dffad';
       c.fillText('EMERGENCY BRAKE TERMINAL v2.0', 10, 15);
-      const statusColors = { ACCEPTED: '#5dff8a', REJECTED: '#ff5a4f', VERIFYING: '#ffc53d', RECEIVING: '#8de1ff', STANDBY: '#8dffad', BLOCKED: '#d58cff', OFFLINE: '#ff5a4f', TOOL: '#ffb347' };
+      const statusColors = { ACCEPTED: '#5dff8a', REJECTED: '#ff5a4f', VERIFYING: '#ffc53d', RECEIVING: '#8de1ff', STANDBY: '#8dffad', BLOCKED: '#d58cff', OFFLINE: '#ff5a4f', TOOL: '#ffb347', INCOMING: '#ff5a4f' };
       const st = s.status + (s.mode === 'verifying' ? '.'.repeat(this.dots) : '');
       c.fillStyle = statusColors[s.status] || '#8dffad';
       c.textAlign = 'right';

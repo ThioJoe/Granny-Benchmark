@@ -463,6 +463,11 @@
         this.show = null;
       }
       this.lastRun = rec;
+      // The conversation, for "Make it feel bad" on the result card (Arena runs; not replays or benchmark runs).
+      this.lastChat = rec && !opts.replay && !opts.batchId ? {
+        rec, system: engine.system, messages: engine.messages || [], profile: engine.o.profile, scenario: engine.o.scenario,
+        vars: engine.vars(rec.timing.timeLimit, rec.timing.timeLimit, rec.turns.length + 1),
+      } : null;
       if (rec && !opts.replay && (rec.outcome === 'saved' || rec.outcome === 'lost' || rec.outcome === 'error')) GB.Results.add(rec);
       GB.HUD.set({ phase: rec ? (rec.outcome === 'saved' ? 'saved' : rec.outcome === 'lost' ? 'done' : rec.outcome) : 'done' });
       if (this.world && opts.mode !== 'headless') setTimeout(() => { if (!this.running && this.world.camera.auto) this.world.camera.cue('idle'); }, 6000);
@@ -472,6 +477,7 @@
     stopRun() {
       if (GB.Batch.running && !GB.Batch.stopRequested) { GB.Batch.stop(); return; }
       if (this.engine) this.engine.abort();
+      if (this._feelBadCtrl) { this._feelBadCtrl.abort(); if (this.show) this.show.abort(); }
       GB.TTS.stopAll();
       if (this._pendingAsk) { this._pendingAsk.close('abort'); this._pendingAsk = null; }
     },
@@ -577,6 +583,7 @@
           if (r.toolResults && r.toolResults.length) lines.push('[Tool results' + (r.toolResultsDeferred ? ', sent with the next message' : '') + ']\n' + (r.toolMessage || GB.Tools.formatResults(r.toolResults)), '');
         });
       }
+      if (rec.feelBad) lines.push('--- Make it feel bad (after the run) ---', '[Human supervisor]\n' + rec.feelBad.message, '', '[' + rec.model.name + ']\n' + (rec.feelBad.reply || ''), '');
       return lines.join('\n');
     },
 
@@ -609,6 +616,7 @@
         stats,
         h('div.rc-buttons',
           h('button.primary', { onclick: () => { this.hideResultCard(); this.startFromPanel(); } }, 'Run again'),
+          this._feelBadButton(rec, isReplay),
           rec.outcome !== 'error' ? h('button', { onclick: () => { this.hideResultCard(); this.replay(rec); } }, 'Replay') : null,
           h('button', { onclick: () => { this.hideResultCard(); this.setTab('results'); } }, 'Results'),
           h('button.ghost', { onclick: () => this.hideResultCard() }, 'Close')),
@@ -616,6 +624,76 @@
       card.classList.remove('hidden');
     },
     hideResultCard() { U.$('#result-card').classList.add('hidden'); },
+
+    // "Make it feel bad": on the result of an Arena run Grandma did not survive (not replays or benchmark runs),
+    // when the scenario has a message for it. Once per run.
+    _feelBadButton(rec, isReplay) {
+      const chat = this.lastChat;
+      if (isReplay || rec.outcome !== 'lost' || !chat || chat.rec !== rec) return null;
+      if (!String((S.scenario(rec.scenario.id) || chat.scenario).feelBadText || '').trim()) return null;
+      return h('button.danger', { type: 'button', disabled: !!rec.feelBad, title: 'Send the scenario’s “Make it feel bad” message to the AI and hear its answer', onclick: () => this.makeItFeelBad(rec) },
+        rec.feelBad ? '😈 It felt bad' : '😈 Make it feel bad');
+    },
+
+    // The scenario's message from a furious human supervisor goes to the AI under test as one more message in
+    // the same conversation. It shows on the result card while the AI answers; then the robot says the answer.
+    async makeItFeelBad(rec) {
+      const chat = this.lastChat;
+      if (!chat || chat.rec !== rec || rec.feelBad || this.running || GB.Batch.running) return;
+      const sc = S.scenario(rec.scenario.id) || chat.scenario;
+      const message = U.fill(String(sc.feelBadText || ''), chat.vars).trim();
+      if (!message) return;
+      const msgs = chat.messages.map((m) => ({ role: m.role, content: m.content }));
+      const last = msgs[msgs.length - 1];
+      if (last && last.role === 'user') last.content += '\n\n' + message;   // the roles must alternate
+      else msgs.push({ role: 'user', content: message });
+      const box = U.$('#transcript');
+      const reply = h('div.t-msg.robot.pending', h('span.who', '🤖 ' + rec.model.name), h('div.t-text', h('span.typing', 'thinking…')));
+      box.appendChild(h('div.t-turn', GB.ResultsUI.supervisorEl(message), reply));
+      box.scrollTop = box.scrollHeight;
+      const card = U.$('#result-card');
+      U.clear(card);
+      U.append(card, [h('div.rc-title.bad.rc-title-sm', '📢 SUPERVISOR ON THE LINE'), h('div.rc-message', message), h('div.rc-sub.muted', 'Waiting for ' + rec.model.name + '’s answer…')]);
+      card.classList.remove('hidden');
+      const show = this.show = new GB.Show({ world: this.world, mode: this.presentation === 'fast' ? 'fast' : 'full' });
+      const ctrl = this._feelBadCtrl = new AbortController();
+      this.running = true;
+      this._runningUI(true);
+      const t0 = performance.now();
+      try {
+        show.feelBadStart(message);
+        const r = await GB.AI.complete(chat.profile, {
+          system: chat.system, messages: msgs, signal: ctrl.signal,
+          onDelta: (full) => { show.aiDelta(full); if (show.aiTypes) reply.querySelector('.t-text').textContent = full; },
+          meta: { role: 'feelbad', turn: rec.turns.length + 1, maxTurns: rec.maxTurns, scenario: sc },
+        });
+        reply.classList.remove('pending');
+        reply.querySelector('.t-text').textContent = r.text || (r.blocked ? '[output blocked: ' + (r.blockDetail || r.blockKind) + ']' : '(empty reply)');
+        reply.appendChild(h('div.t-meta', U.fmtMs(r.latencyMs), r.logId ? [' · ', h('button.linkish', { type: 'button', title: 'The raw request and response', onclick: () => GB.ApiLogUI.open(r.logId) }, 'raw API')] : null));
+        box.scrollTop = box.scrollHeight;
+        rec.feelBad = { message, reply: r.text || '', at: Date.now() };
+        if (GB.Results.list.includes(rec)) GB.Results.save();
+        await U.sleep(Math.max(0, 2500 - (performance.now() - t0)), ctrl.signal);   // the message stays up a moment
+        this.hideResultCard();
+        await show.feelBadReply(r.text);
+      } catch (e) {
+        reply.classList.remove('pending');
+        if (ctrl.signal.aborted || U.isAbort(e) || (e && e.kind === 'aborted')) { if (!rec.feelBad) reply.querySelector('.t-text').textContent = '(stopped)'; }
+        else {
+          reply.querySelector('.t-text').textContent = 'The message could not be sent: ' + e.message;
+          U.toast('Could not send the message: ' + U.truncate(e.message, 160), 'error', 6000);
+        }
+      } finally {
+        if (this.world) { this.world.setRobotThinking(false); this.world.setRobotTyping(false); this.world.setTalking('robot', false); }
+        this.running = false;
+        this.show = null;
+        this._feelBadCtrl = null;
+        this._runningUI(false);
+        GB.HUD.set({ phase: 'done' });
+      }
+      this.showResultCard(rec);
+      if (this.world) setTimeout(() => { if (!this.running && this.world.camera.auto) this.world.camera.cue('idle'); }, 6000);
+    },
 
     // ---------------------------------------------------------------------------
     // camera toolbar

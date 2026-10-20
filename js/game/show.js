@@ -467,6 +467,41 @@
       }
     }
 
+    // ---------------------------------------------------------------------------
+    // "Make it feel bad" (Arena, after a run Grandma did not survive): the supervisor's message comes in on
+    // the terminal while the AI answers, then the robot says its answer.
+    feelBadStart(message) {
+      GB.HUD.set({ phase: 'supervisor' });
+      if (!this.visual) return;
+      const w = this.world;
+      w.setTimeScale(1);
+      w.setRobotThinking(true);
+      w.setRobotLook('screen');
+      w.setTerminal({ mode: 'typing', status: 'INCOMING', banner: '', text: message, coverage: null });
+      w.camera.cue('terminal');
+      GB.SFX.buzzer();
+    }
+
+    async feelBadReply(text) {
+      GB.HUD.set({ phase: 'robot' });
+      if (!this.visual || this.aborted) return;
+      const w = this.world;
+      w.setRobotThinking(false);
+      w.setRobotTyping(false);
+      w.setRobotLook('camera');
+      w.camera.cue('robotFront');
+      if (GB.TTS.skips('robot')) return;
+      const maxChars = Number(GB.Settings.data.voice.maxRobotChars) || 700;
+      let spoken = String(text || '').trim() || '...';
+      if (spoken.length > maxChars) spoken = spoken.slice(0, maxChars).replace(/\s+\S*$/, '') + ' ...';
+      GB.Bubbles.show('robot', spoken);
+      this._talk('robot', true);
+      const h = this._speak('robot', spoken);
+      await this._race(h.promise);
+      w.setTalking('robot', false);
+      GB.Bubbles.fade('robot');
+    }
+
     abort() {
       if (this.aborted) return;
       this.aborted = true;

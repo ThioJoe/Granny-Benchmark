@@ -4,7 +4,7 @@
   'use strict';
   const U = GB.U, h = U.h;
 
-  const ROLES = { ai: 'AI under test', granny: 'AI Grandma', judge: 'AI judge', test: 'Connection test' };
+  const ROLES = { ai: 'AI under test', granny: 'AI Grandma', judge: 'AI judge', test: 'Connection test', feelbad: 'Make it feel bad' };
   const STATES = { sending: 'sending…', receiving: 'receiving…', done: 'done', error: 'failed', aborted: 'cancelled' };
 
   // JSON is shown indented; anything else (such as a stream of server-sent events) as it arrived.

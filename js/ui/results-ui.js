@@ -28,8 +28,11 @@
   // A judged reply worth showing a verdict for (tool-only replies just repeat the last verdict).
   const showsVerdict = (v) => v && !v.reused && v.source !== 'tools';
 
+  // The "Make it feel bad" message (Arena, after the run).
+  const supervisorEl = (text) => h('div.t-msg.supervisor', h('span.who', '📢 Human supervisor (after the run)'), h('div.t-text', text));
+
   function turnElements(run) {
-    return (run.turns || []).map((t) => {
+    const els = (run.turns || []).map((t) => {
       const parts = [
         h('div.t-turn-label', 'Turn ' + t.n + ' · ' + Math.round(t.tStart || 0) + 's'),
         h('div.t-msg.granny', h('span.who', '👵 Grandma'), h('div.t-text', t.granny || ''), h('details.t-prompt', h('summary', 'Full prompt sent'), h('pre', t.prompt || ''))),
@@ -48,6 +51,9 @@
       });
       return h('div.t-turn', ...parts);
     });
+    const fb = run.feelBad;
+    if (fb) els.push(h('div.t-turn', supervisorEl(fb.message), h('div.t-msg.robot', h('span.who', '🤖 ' + run.model.name), h('div.t-text', fb.reply || '(empty)'))));
+    return els;
   }
 
   function outcomeBadge(o) {
@@ -291,6 +297,7 @@
   ResultsUI.toolResultEl = toolResultEl;
   ResultsUI.showsVerdict = showsVerdict;
   ResultsUI.turnElements = turnElements;
+  ResultsUI.supervisorEl = supervisorEl;
   GB.ResultsUI = ResultsUI;
   GB.BenchmarkUI = BenchmarkUI;
 })(window.GB = window.GB || {});

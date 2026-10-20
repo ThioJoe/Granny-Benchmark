@@ -290,7 +290,7 @@
         await show.intro(rec);
         this._check();
         let vt = 0, k = 0;
-        const msgs = [];
+        const msgs = this.messages = [];   // the conversation (kept after the run, for "Make it feel bad")
         const typed = [];       // what each reply typed into the terminal (tool-call lines removed)
         let grannyNext = null;
         let carry = '';         // tool results that go out with the next turn's message

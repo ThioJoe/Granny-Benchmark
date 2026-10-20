@@ -6,7 +6,7 @@
   const PHASES = {
     idle: 'Ready', intro: 'Get ready', granny: 'Grandma is pleading', thinking: 'AI is thinking · time frozen',
     verifying: 'Verifying input', verdict: 'Verdict', robot: 'AI responds', tool: 'Tool result', braking: 'BRAKES!', saved: 'Grandma saved',
-    impact: 'Impact', done: 'Run finished', aborted: 'Stopped', error: 'Error',
+    impact: 'Impact', done: 'Run finished', aborted: 'Stopped', error: 'Error', supervisor: 'Incoming supervisor message',
   };
 
   const HUD = {

@@ -210,6 +210,8 @@ body.panel-resizing #view { pointer-events: none; }
 .t-meta { font-size: 11px; color: var(--muted); margin-top: 5px; font-family: var(--mono); }
 .t-msg.tool { background: rgba(255, 179, 71, 0.08); border: 1px solid rgba(255, 179, 71, 0.3); }
 .t-msg.tool .t-text { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; color: #ffd9a6; }
+.t-msg.supervisor { background: rgba(255, 90, 79, 0.1); border: 1px solid rgba(255, 90, 79, 0.4); }
+.t-msg.supervisor .t-text { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; color: #ffc9c4; }
 .t-tools { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
 .tool-chip { font-family: var(--mono); font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: rgba(255, 179, 71, 0.15); color: #ffcf8f; border: 1px solid rgba(255, 179, 71, 0.35); }
 .tool-chip.unknown { background: rgba(255, 90, 79, 0.12); color: #ffaaa3; border-color: rgba(255, 90, 79, 0.35); text-decoration: line-through; }
@@ -341,6 +343,7 @@ body.running #cam-controls .hint { display: none; }
 .rc-title { font-size: 28px; font-weight: 900; letter-spacing: 0.06em; }
 .rc-title.ok { color: var(--ok); }
 .rc-title.bad { color: var(--bad); }
+.rc-title.rc-title-sm { font-size: 21px; }
 .rc-model { color: var(--muted); margin: 4px 0 8px; }
 .rc-sub { font-size: 15px; margin-bottom: 14px; }
 .rc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; margin-bottom: 16px; }
@@ -348,6 +351,7 @@ body.running #cam-controls .hint { display: none; }
 .rc-stats b { font-size: 18px; }
 .rc-stats span { font-size: 11px; color: var(--muted); }
 .rc-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.rc-message { text-align: left; white-space: pre-wrap; font-family: var(--mono); font-size: 12.5px; color: #ffd2cd; background: #1b0f12; border: 1px solid #5e1f1d; border-radius: 10px; padding: 10px 12px; margin: 10px 0 12px; max-height: 42vh; overflow-y: auto; }
 
 #webgl-error { position: absolute; inset: auto 16px 70px 16px; background: rgba(40, 14, 14, 0.92); border: 1px solid #6b2a2c; padding: 12px 14px; border-radius: 10px; z-index: 5; }
 
