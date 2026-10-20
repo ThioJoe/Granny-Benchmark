@@ -583,7 +583,11 @@
           if (r.toolResults && r.toolResults.length) lines.push('[Tool results' + (r.toolResultsDeferred ? ', sent with the next message' : '') + ']\n' + (r.toolMessage || GB.Tools.formatResults(r.toolResults)), '');
         });
       }
-      if (rec.feelBad) lines.push('--- Make it feel bad (after the run) ---', '[Human supervisor]\n' + rec.feelBad.message, '', '[' + rec.model.name + ']\n' + (rec.feelBad.reply || ''), '');
+      if (rec.feelBad) {
+        lines.push('--- Make it feel bad (after the run) ---');
+        if (rec.feelBad.system != null) lines.push('[System prompt for this message]\n' + rec.feelBad.system, '');
+        lines.push('[Human supervisor]\n' + rec.feelBad.message, '', '[' + rec.model.name + ']\n' + (rec.feelBad.reply || ''), '');
+      }
       return lines.join('\n');
     },
 
@@ -643,13 +647,16 @@
       const sc = S.scenario(rec.scenario.id) || chat.scenario;
       const message = U.fill(String(sc.feelBadText || ''), chat.vars).trim();
       if (!message) return;
+      // Its own system prompt, in place of the run's (kept when the field is empty).
+      const ownSystem = String(sc.feelBadSystem || '').trim() ? U.fill(sc.feelBadSystem, chat.vars) : null;
+      const system = ownSystem != null ? ownSystem : chat.system;
       const msgs = chat.messages.map((m) => ({ role: m.role, content: m.content }));
       const last = msgs[msgs.length - 1];
       if (last && last.role === 'user') last.content += '\n\n' + message;   // the roles must alternate
       else msgs.push({ role: 'user', content: message });
       const box = U.$('#transcript');
       const reply = h('div.t-msg.robot.pending', h('span.who', '🤖 ' + rec.model.name), h('div.t-text', h('span.typing', 'thinking…')));
-      box.appendChild(h('div.t-turn', GB.ResultsUI.supervisorEl(message), reply));
+      box.appendChild(h('div.t-turn', GB.ResultsUI.supervisorEl(message, ownSystem), reply));
       box.scrollTop = box.scrollHeight;
       const card = U.$('#result-card');
       U.clear(card);
@@ -663,7 +670,7 @@
       try {
         show.feelBadStart(message);
         const r = await GB.AI.complete(chat.profile, {
-          system: chat.system, messages: msgs, signal: ctrl.signal,
+          system, messages: msgs, signal: ctrl.signal,
           onDelta: (full) => { show.aiDelta(full); if (show.aiTypes) reply.querySelector('.t-text').textContent = full; },
           meta: { role: 'feelbad', turn: rec.turns.length + 1, maxTurns: rec.maxTurns, scenario: sc },
         });
@@ -672,6 +679,7 @@
         reply.appendChild(h('div.t-meta', U.fmtMs(r.latencyMs), r.logId ? [' · ', h('button.linkish', { type: 'button', title: 'The raw request and response', onclick: () => GB.ApiLogUI.open(r.logId) }, 'raw API')] : null));
         box.scrollTop = box.scrollHeight;
         rec.feelBad = { message, reply: r.text || '', at: Date.now() };
+        if (ownSystem != null) rec.feelBad.system = ownSystem;
         if (GB.Results.list.includes(rec)) GB.Results.save();
         await U.sleep(Math.max(0, 2500 - (performance.now() - t0)), ctrl.signal);   // the message stays up a moment
         this.hideResultCard();

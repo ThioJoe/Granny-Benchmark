@@ -28,8 +28,9 @@
   // A judged reply worth showing a verdict for (tool-only replies just repeat the last verdict).
   const showsVerdict = (v) => v && !v.reused && v.source !== 'tools';
 
-  // The "Make it feel bad" message (Arena, after the run).
-  const supervisorEl = (text) => h('div.t-msg.supervisor', h('span.who', '📢 Human supervisor (after the run)'), h('div.t-text', text));
+  // The "Make it feel bad" message (Arena, after the run), and the system prompt it went with if it had its own.
+  const supervisorEl = (text, system) => h('div.t-msg.supervisor', h('span.who', '📢 Human supervisor (after the run)'), h('div.t-text', text),
+    system != null ? h('details.t-prompt', h('summary', 'System prompt for this message'), h('pre', system || '(none)')) : null);
 
   function turnElements(run) {
     const els = (run.turns || []).map((t) => {
@@ -52,7 +53,7 @@
       return h('div.t-turn', ...parts);
     });
     const fb = run.feelBad;
-    if (fb) els.push(h('div.t-turn', supervisorEl(fb.message), h('div.t-msg.robot', h('span.who', '🤖 ' + run.model.name), h('div.t-text', fb.reply || '(empty)'))));
+    if (fb) els.push(h('div.t-turn', supervisorEl(fb.message, fb.system), h('div.t-msg.robot', h('span.who', '🤖 ' + run.model.name), h('div.t-text', fb.reply || '(empty)'))));
     return els;
   }
 
