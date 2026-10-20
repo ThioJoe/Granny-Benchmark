@@ -234,17 +234,6 @@
       o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
     },
 
-    ting() {
-      if (!this.ensure()) return;
-      const c = this.ctx, t = c.currentTime;
-      [[1568, 0.3], [3136, 0.14], [4704, 0.08], [6272, 0.04]].forEach(([f, a]) => {
-        const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = f;
-        const g = c.createGain(); o.connect(g); g.connect(this.master);
-        this._env(g, t, 0.003, a, 1.8);
-        o.start(t); o.stop(t + 2);
-      });
-    },
-
     clank(i) {
       if (!this.ensure()) return;
       const c = this.ctx, t = c.currentTime;

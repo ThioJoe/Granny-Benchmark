@@ -21,7 +21,6 @@
     trainChase: (w) => { const z = w.train.root.position[2]; return { pos: [-3.4, 2.3, z - 8.5], target: [0, 1.3, z] }; },
     trainCam: (w) => { const z = Math.max(w.train.root.position[2], 6); return { pos: [2.8, 3.8, z + 5], target: [0, 1.0, 0] }; },
     followGranny: (w) => {
-      if (w.starCam) return { pos: w.starCam, target: w.star.position.slice(), fov: 0.9 };
       const p = w.granny.rig.position;
       const rise = Math.max(0, p[1] - 2);
       return { pos: [p[0] - 6.5 + Math.min(rise, 4), Math.max(1.4, p[1] - 2.2), p[2] - 8.5 + Math.min(rise, 3)], target: [p[0], p[1] + 0.5, p[2]], fov: 0.9 };

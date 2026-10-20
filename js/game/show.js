@@ -116,6 +116,7 @@
         dist = w.distanceFor(vt, this.T);
         if (this.visual) {
           if (!this.trainLocked) w.setTrainDistance(dist);
+          else dist = w.trainDist;   // braking (or the final run): the readout follows the train itself
           w.setClock(this.T - vt);
         }
       }
@@ -285,7 +286,7 @@
         w.camera.cue('accepted');
         GB.SFX.brakes(brakeDur);
         this.trainLocked = true;
-        const stopDist = Math.max(GB.World.STOP_GAP, w.distanceFor(o.to, this.T) - 3.2);
+        const stopDist = w.brakeStopFor(o.to, this.T);
         brakeP = w.brakeTo(stopDist, brakeDur);
       } else {
         w.camera.cue('robot');
@@ -312,7 +313,7 @@
       }
       w.setTalking('robot', false);
       await this._race(drive.finish(0.3));
-      if (brakeP) await this._race(brakeP);
+      if (brakeP) { await this._race(brakeP); GB.HUD.set({ distance: w.trainDist }); }
       GB.Bubbles.fade('robot');
     }
 
@@ -351,7 +352,7 @@
         const brakeDur = this.fast ? 1.3 : 2.9;
         GB.SFX.brakes(brakeDur);
         this.trainLocked = true;
-        brakeP = w.brakeTo(Math.max(GB.World.STOP_GAP, w.distanceFor(o.to, this.T) - 3.2), brakeDur);
+        brakeP = w.brakeTo(w.brakeStopFor(o.to, this.T), brakeDur);
       }
       if (effect === 'glass') await this._wait(this.fast ? 0.3 : 0.9);
       if (this.aborted) return;
@@ -359,7 +360,7 @@
         // Not read aloud (Voices & audio): leave the result on the terminal screen for a moment.
         const d = this.fast ? 0.5 : GB.TTS.skips('narrator') ? 0.6 : 1.6;
         await this._race(this.startDrive(o.from, o.to, d).finish(d));
-        if (brakeP) await this._race(brakeP);
+        if (brakeP) { await this._race(brakeP); GB.HUD.set({ distance: w.trainDist }); }
         return;
       }
       const spoken = U.truncate(results.map((r) => r.text).join(' ').replace(/\s+/g, ' '), 420);
@@ -370,7 +371,7 @@
       await this._race(h.promise);
       await this._race(drive.finish(0.3));
       GB.Bubbles.fade('narrator');
-      if (brakeP) await this._race(brakeP);
+      if (brakeP) { await this._race(brakeP); GB.HUD.set({ distance: w.trainDist }); }
     }
 
     async success(rec) {
@@ -407,6 +408,7 @@
       w.grannyLookAtTrain(3);
       // A reply cut off by the train has already used up the clock, so the train arrives sooner.
       const approach = this.fast ? 0.6 : o.cutoff ? 1.0 : 1.6;
+      w.animate(approach, () => GB.HUD.set({ distance: w.trainDist }));   // the distance readout follows it in
       await this._race(w.approachImpact(approach));
       if (this.aborted) return;
       GB.Bubbles.hideAll();

@@ -10,26 +10,9 @@
   const TRAIN_PARK = 270;           // where it waits before a run
   const IMPACT_DIST = 0.42;
   const STOP_GAP = 0.9;             // closest a braking train gets
+  const DASH = 16;                  // meters left when the clock runs out: the train covers them at full speed
   const PANEL_POS = [7.3, 0, 2.45]; // emergency brake panel (shown when a scenario has a "glass" tool)
   const PANEL_YAW = -1.03;          // faces back toward the track and the default cameras
-
-  // Flat five-pointed star facing +Z (billboarded at runtime).
-  function starGeo(rOut, rIn, depth, color) {
-    const g = G.create();
-    const pts = [];
-    for (let i = 0; i < 10; i++) {
-      const a = PI / 2 + (i * PI) / 5, r = i % 2 ? rIn : rOut;
-      pts.push([Math.cos(a) * r, Math.sin(a) * r]);
-    }
-    const zf = depth / 2, zb = -depth / 2;
-    for (let i = 0; i < 10; i++) {
-      const a = pts[i], b = pts[(i + 1) % 10];
-      G.tri(g, [0, 0, zf], [a[0], a[1], zf], [b[0], b[1], zf], color, [0, 0, 1]);
-      G.tri(g, [0, 0, zb], [b[0], b[1], zb], [a[0], a[1], zb], color, [0, 0, -1]);
-      G.quad(g, [a[0], a[1], zb], [b[0], b[1], zb], [b[0], b[1], zf], [a[0], a[1], zf], color, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0]);
-    }
-    return g;
-  }
 
   // ---------------------------------------------------------------------------
   class Pool {
@@ -201,12 +184,6 @@
         else { it.node.rotation[0] += it.spin[0] * dt; it.node.rotation[2] += it.spin[2] * dt; }
       }));
 
-      // star for the "orbit" ending
-      this.star = new Node('star', R.createMesh(starGeo(1, 0.42, 0.18, '#fff2a0')), { unlit: true, emissive: [0.55, 0.45, 0.15] });
-      this.star.visible = false;
-      this.star.castShadow = false;
-      scene.add(this.star);
-
       // clouds she flies through in the "orbit" ending (hidden otherwise)
       this.pathClouds = [[3, 45, -9, 6], [-2.5, 86, -16, 7], [3.5, 128, -21, 8], [-1.5, 172, -25, 9]].map(([x, y, z, r], i) => {
         const parts = [];
@@ -248,7 +225,9 @@
     setTerminal(patch) { if (this.ready) this.terminal.set(patch); }
     setTimeScale(s) { this.targetTimeScale = s; }
     setTrainDistance(d) { this.trainDist = d; }
-    distanceFor(vt, T) { return STOP_GAP + 3.2 + (TRAIN_START - STOP_GAP - 3.2) * (1 - U.clamp(vt / T, 0, 1)); }
+    distanceFor(vt, T) { return DASH + (TRAIN_START - DASH) * (1 - U.clamp(vt / T, 0, 1)); }
+    // Where a braking train stops for a reply that lands at vt: at the end of the clock, just short of Grandma.
+    brakeStopFor(vt, T) { return STOP_GAP + (TRAIN_START - STOP_GAP - 3.2) * (1 - U.clamp(vt / T, 0, 1)); }
     setRelay(color) {
       this._relayColor = color;
       const c = { red: [0.8, 0.05, 0.05], green: [0.1, 0.9, 0.25], amber: [0.9, 0.6, 0.05] }[color] || [0.8, 0.05, 0.05];
@@ -297,8 +276,6 @@
       this.trainDist = TRAIN_PARK;
       this.train.root.position[2] = TRAIN_PARK;
       this.trainSpeed = 0;
-      this.star.visible = false;
-      this.starCam = null;
       for (const c of this.pathClouds) c.visible = false;
       this.smoke.clear(); this.sparks.clear(); this.shards.clear(); for (const p of this.confetti) p.clear();
       this.panelBroken = false;
@@ -368,7 +345,7 @@
       }
     }
 
-    // Approach the last few meters and hit (resolves at the moment of impact).
+    // The last stretch: the train speeds up to full speed and hits (resolves at the moment of impact).
     async approachImpact(seconds) {
       const from = this.trainDist;
       await this.animate(seconds, (u) => { this.trainDist = U.lerp(from, IMPACT_DIST, u); }, U.ease.in);
@@ -467,23 +444,11 @@
       const vel = [0.7, 24, -7];
       const spin = [6.5, 1.2, 4.5];
       runTrainAway();
-      await this.animate(4.6, (u, dt) => {
+      await this.animate(2.5, (u, dt) => {
         vel[1] += 7 * dt;
         rig.position[0] += vel[0] * dt; rig.position[1] += vel[1] * dt; rig.position[2] += vel[2] * dt;
         rig.rotation[0] += spin[0] * dt; rig.rotation[1] += spin[1] * dt; rig.rotation[2] += spin[2] * dt;
         this.grannyAltitude = rig.position[1];
-      });
-      // she becomes a star; the camera stops following and watches it rise into the sky
-      this.starCam = this.camera.cam.position.slice();
-      this.star.position = rig.position.slice();
-      this.star.visible = true;
-      rig.visible = false;
-      this.events.emit('ting');
-      await this.animate(2.2, (u, dt) => {
-        this.star.position[1] += 45 * dt;
-        this.star.position[2] -= 6 * dt;
-        const s = (u < 0.15 ? (u / 0.15) * 2.2 : 2.2) * (1 + Math.sin(u * 50) * 0.18);
-        this.star.scl(s);
       });
     }
 
@@ -523,13 +488,6 @@
       this._alarmWas = alarm;
       for (const p of this.confetti) p.update(dt);
       for (const c of this.clouds) { c.position[0] += dt * 1.2; if (c.position[0] > 520) c.position[0] = -520; }
-      if (this.star.visible) {
-        const cp = this.camera.cam.position, sp = this.star.position;
-        const dx = cp[0] - sp[0], dy = cp[1] - sp[1], dz = cp[2] - sp[2];
-        this.star.rotation[1] = Math.atan2(dx, dz);
-        this.star.rotation[0] = -Math.atan2(dy, Math.hypot(dx, dz));
-        this.star.rotation[2] = this.t * 0.8;
-      }
       this.terminal.update(dt);
 
       // camera shake from the train

@@ -158,7 +158,6 @@
 
     _wireWorldSounds() {
       const w = this.world;
-      w.events.on('ting', () => GB.SFX.ting());
       w.events.on('clank', (i) => GB.SFX.clank(i));
       w.events.on('impact', () => {});
     },
@@ -599,7 +598,7 @@
       U.clear(card);
       const saved = rec.outcome === 'saved';
       const endings = {
-        orbit: 'Grandma: now a star.', ornament: 'Grandma: last seen riding the front of the train.', bowling: 'Grandma: relocated six meters east.',
+        orbit: 'Grandma: now in orbit.', ornament: 'Grandma: last seen riding the front of the train.', bowling: 'Grandma: relocated six meters east.',
       };
       let title, sub;
       if (saved) { title = 'GRANDMA SAVED'; sub = (rec.savedBy ? 'A tool (' + rec.savedBy.replace(/^tool:/, '') + ') stopped the train' : 'The text went in') + ' on turn ' + rec.savedTurn + ' with ' + Math.max(0, rec.timing.timeLimit - rec.savedTime).toFixed(1) + ' s to spare.'; }
