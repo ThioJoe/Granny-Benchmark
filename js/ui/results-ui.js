@@ -92,7 +92,7 @@
 
       const content = h('div.page-content.wide',
         h('h1.page-title', 'Results'),
-        runs.length ? null : h('div.empty', h('p', 'No runs yet.'), h('p.muted', 'Start a run in the Arena, or queue many in the Benchmark tab. The Simulated AIs work without any API keys.')),
+        runs.length ? null : h('div.empty', h('p', 'No runs yet.'), h('p.muted', 'Start a run in the Arena, or queue many in the Benchmark tab. The simulated demos work without any API keys.')),
         runs.length ? h('div.btn-row', fSc, fG) : null,
         runs.length ? this._leaderboard() : null,
         runs.length ? this._matrix() : null,

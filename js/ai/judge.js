@@ -97,7 +97,7 @@
       let v;
 
       if (latest.simulated && latest.simVerdict && mode !== 'reference') {
-        v = { category: latest.simVerdict, realFraction: latest.simVerdict === 'match' ? 1 : 0, reason: 'Simulated AI (offline demo) reports its own verdict.', source: 'simulated' };
+        v = { category: latest.simVerdict, realFraction: latest.simVerdict === 'match' ? 1 : 0, reason: 'Demo (no AI): the verdict is part of its script.', source: 'simulated' };
       } else if (mode === 'reference') {
         const cov = this.coverage(opts.scenario.referenceText, typedAll);
         const latestCov = this.coverage(opts.scenario.referenceText, latest.text).coverage;

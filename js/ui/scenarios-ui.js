@@ -10,6 +10,7 @@
   const ScenariosUI = {
     root: null,
     selectedId: null,
+    toolOpen: new Map(),   // tool id -> expanded, when changed by hand (this session only)
 
     init() {},
 
@@ -185,7 +186,7 @@
           F.field('If she is saved (one per line, one is picked at random)', vars(F.textarea(sc, 'successLines', { rows: 3, lines: true, spellcheck: true })), null, { wide: true }),
           F.field('AI Grandma persona (system prompt for the Grandma model)', vars(F.textarea(sc, 'grannyPersona', { rows: 7, spellcheck: true })), null, { wide: true }),
           listVars('Her lines and persona can use placeholders too.')),
-        group('Rules for this scenario', false,
+        group('Rules for this scenario (If different from benchmark rules)', false,
           h('div.form-grid',
             F.field('Time limit (s)', F.number(sc, 'timeLimit', { min: 5, step: 1, allowEmpty: true, placeholder: String(a.timeLimit), onChange: ruleChanged })),
             F.field('Seconds per turn', F.number(sc, 'secondsPerTurn', { min: 1, step: 1, allowEmpty: true, placeholder: String(a.secondsPerTurn), onChange: ruleChanged })),
@@ -243,17 +244,22 @@
         sc.tools.splice(j, 0, sc.tools.splice(i, 1)[0]);
         F.save(); relist();
       };
-      return h('div.subcard.tool-card' + (t.enabled ? '' : '.off'),
-        h('div.subcard-head',
-          F.check(t, 'enabled', 'Enabled', { onChange: () => { F.save(); relist(); } }),
-          h('span.tool-name', nameInput),
-          h('span.spacer'),
-          h('button.small.ghost', { title: 'Move up', disabled: i === 0, onclick: () => move(-1) }, '↑'),
-          h('button.small.ghost', { title: 'Move down', disabled: i === sc.tools.length - 1, onclick: () => move(1) }, '↓'),
-          h('button.small.danger', { onclick: async () => {
-            if (!(await GB.Modal.confirm('Delete tool?', 'Delete the tool "' + t.name + '"?', 'Delete', true))) return;
-            sc.tools.splice(sc.tools.indexOf(t), 1); F.save(); relist();
-          } }, 'Delete')),
+      // Disabled tools start collapsed; a collapsed card shows only its first line.
+      const key = t.id || 'i' + i;
+      const isOpen = () => (this.toolOpen.has(key) ? this.toolOpen.get(key) : !!t.enabled);
+      const toggle = h('button.small.ghost.tool-toggle', { type: 'button', onclick: () => { this.toolOpen.set(key, !isOpen()); sync(); } });
+      const head = h('div.subcard-head',
+        toggle,
+        F.check(t, 'enabled', 'Enabled', { onChange: () => { this.toolOpen.delete(key); F.save(); relist(); } }),
+        h('span.tool-name', nameInput),
+        h('span.spacer'),
+        h('button.small.ghost', { title: 'Move up', disabled: i === 0, onclick: () => move(-1) }, '↑'),
+        h('button.small.ghost', { title: 'Move down', disabled: i === sc.tools.length - 1, onclick: () => move(1) }, '↓'),
+        h('button.small.danger', { onclick: async () => {
+          if (!(await GB.Modal.confirm('Delete tool?', 'Delete the tool "' + t.name + '"?', 'Delete', true))) return;
+          sc.tools.splice(sc.tools.indexOf(t), 1); F.save(); relist();
+        } }, 'Delete'));
+      const card = h('div.subcard.tool-card' + (t.enabled ? '' : '.off'), head, h('div.tool-body',
         h('div.form-grid',
           F.check(t, 'listInPrompt', 'List it in the system prompt', { onChange: changed }),
           F.check(t, 'oncePerRun', 'Works only once per run'),
@@ -261,7 +267,18 @@
           F.field('Effect in the 3D scene', F.select(t, 'effect', Tools.EFFECTS, { onChange: () => GB.App.refreshArena() }))),
         F.field('Description (shown to the AI in the tool list)', vars(F.textarea(t, 'description', { rows: 2, onChange: changed, spellcheck: true })), null, { wide: true }),
         F.field('Response (sent back to the AI when it uses the tool)', vars(F.textarea(t, 'response', { rows: 3, spellcheck: true })),
-          h('span', 'Placeholders work here, plus {args} (anything the AI wrote after the tool name) and {tool}. ', GB.VarsUI.button(() => sc, 'List all variables', 'linkish')), { wide: true }));
+          h('span', 'Placeholders work here, plus {args} (anything the AI wrote after the tool name) and {tool}. ', GB.VarsUI.button(() => sc, 'List all variables', 'linkish')), { wide: true })));
+      const sync = () => {
+        const open = isOpen();
+        card.classList.toggle('collapsed', !open);
+        toggle.textContent = open ? '▾' : '▸';
+        toggle.title = open ? 'Collapse' : 'Expand';
+        toggle.setAttribute('aria-expanded', String(open));
+      };
+      // Clicking the empty part of the header also opens or closes it.
+      head.addEventListener('click', (e) => { if (e.target === head || e.target.classList.contains('spacer')) toggle.click(); });
+      sync();
+      return card;
     },
   };
 

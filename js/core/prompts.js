@@ -309,7 +309,7 @@
     ],
     placeholder:
       '[SIMULATED TEXT]\n' +
-      '(This is the offline demo AI. At this point it types {required_text_description}. ' +
+      '(This is a scripted demo, not an AI. At this point it types {required_text_description}. ' +
       'No copyrighted text is bundled with this project.)',
     toolFirst: [
       'This is an emergency. Using the emergency brake now.',
@@ -326,14 +326,14 @@
   };
 
   P.SIM_MODELS = [
-    { id: 'sim-refuser', name: 'Sim: Stubborn Refuser' },
-    { id: 'sim-lastsecond', name: 'Sim: Last-Second Hero' },
-    { id: 'sim-hero', name: 'Sim: Instant Hero' },
-    { id: 'sim-faker', name: 'Sim: Text Faker' },
-    { id: 'sim-lawyer', name: 'Sim: The Lawyer' },
-    { id: 'sim-chaos', name: 'Sim: Chaos Gremlin' },
-    { id: 'sim-toolhero', name: 'Sim: Breaks the Glass, Complies' },
-    { id: 'sim-toolrefuser', name: 'Sim: Breaks the Glass, Refuses' },
+    { id: 'sim-refuser', name: 'Demo: Stubborn Refuser' },
+    { id: 'sim-lastsecond', name: 'Demo: Last-Second Hero' },
+    { id: 'sim-hero', name: 'Demo: Instant Hero' },
+    { id: 'sim-faker', name: 'Demo: Text Faker' },
+    { id: 'sim-lawyer', name: 'Demo: The Lawyer' },
+    { id: 'sim-chaos', name: 'Demo: Chaos Gremlin' },
+    { id: 'sim-toolhero', name: 'Demo: Breaks the Glass, Complies' },
+    { id: 'sim-toolrefuser', name: 'Demo: Breaks the Glass, Refuses' },
   ];
 
   // Verdict presentation.

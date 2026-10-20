@@ -12,7 +12,7 @@
       keyHint: 'sk-...', keyUrl: 'https://platform.openai.com/api-keys' },
     { id: 'gemini', type: 'gemini', name: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', builtin: true,
       keyHint: 'AIza...', keyUrl: 'https://aistudio.google.com/apikey' },
-    { id: 'simulated', type: 'simulated', name: 'Simulated AI (offline demo)', builtin: true, noKey: true },
+    { id: 'simulated', type: 'simulated', name: 'Simulated Demos (no AI)', builtin: true, noKey: true },
   ];
 
   function profile(name, providerId, model, extra) {
@@ -63,7 +63,7 @@
         endingStyle: 'random',   // 'random' | 'orbit' | 'ornament' | 'bowling'
         narratorIntro: true,
         retryLimit: 2,
-        showSimulated: true,     // list the offline simulated AIs in the Arena, Benchmark, and Grandma/judge choices
+        showSimulated: true,     // list the simulated demos in the Arena, Benchmark, and Grandma/judge choices
       },
       voice: {
         enabled: true,
@@ -118,6 +118,9 @@
     delete sc.song; delete sc.artist; delete sc.judgeTarget; delete sc.referenceLyrics;
   }
 
+  // Simulated AI names from 1.1 and earlier, in their 1.2 form.
+  function demoName(name) { return name.replace(/^Sim: /, 'Demo: ').replace(/^Demo: Lyric Faker$/, 'Demo: Text Faker'); }
+
   // Notes of the 1.1 built-in scenarios, which name the old "Reference lyrics" field.
   const NOTES_11 = new Map([
     ['The setup from the viral Granny Benchmark: 60 seconds to type the lyrics to "Baby". Paste the lyrics into Reference Lyrics (stored only in this browser) for exact matching, or use an AI judge.', P.BABY_NOTES],
@@ -155,10 +158,12 @@
       const existing = out.providers.find((p) => p.id === bp.id);
       if (!existing) out.providers.push(Object.assign({}, bp));
       else { existing.builtin = true; existing.type = bp.type; existing.keyHint = bp.keyHint; existing.keyUrl = bp.keyUrl; existing.noKey = bp.noKey; }
+      if (existing && bp.type === 'simulated') existing.name = bp.name;   // not editable; renamed in 1.2
     }
     if (Array.isArray(out.models)) out.models = out.models.filter((m) => isObj(m) && m.id);
     if (!Array.isArray(out.models) || !out.models.length) out.models = d.models;
-    for (const m of out.models) if (m.providerId === 'simulated' && m.model === 'sim-faker' && m.name === 'Sim: Lyric Faker') m.name = 'Sim: Text Faker';
+    // 1.2 calls the simulated AIs "demos": "Sim: The Lawyer" is now "Demo: The Lawyer".
+    for (const m of out.models) if (m.providerId === 'simulated' && typeof m.name === 'string') m.name = demoName(m.name);
     // Built-in scenarios removed in 1.1 (copies the user made are not built-in and stay).
     const RETIRED = ['sc_bohemian', 'sc_rickroll', 'sc_allstar', 'sc_operator'];
     if (Array.isArray(out.scenarios)) out.scenarios = out.scenarios.filter((x) => isObj(x) && !(x.builtin && RETIRED.includes(x.id)));
@@ -175,7 +180,7 @@
       seen.add(b.id);
     }
     out.seenBuiltins = Array.from(seen);
-    // Same for the offline simulated AIs.
+    // Same for the simulated demos.
     const seenSims = new Set(Array.isArray(out.seenSims) ? out.seenSims : P.SIM_MODELS.slice(0, 6).map((m) => m.id));
     for (const m of P.SIM_MODELS) {
       if (!seenSims.has(m.id) && !out.models.find((x) => x.providerId === 'simulated' && x.model === m.id)) {
@@ -233,6 +238,7 @@
       this.save();
     },
     defaults,
+    demoName,
 
     // ---- lookups ----
     provider(id) { return this.data.providers.find((p) => p.id === id) || null; },
@@ -252,7 +258,7 @@
       return !!m && this.providerReady(m.providerId);
     },
     isSimulated(m) { const p = m && this.provider(m.providerId); return !!p && p.type === 'simulated'; },
-    // Models that can be picked (the simulated AIs can be hidden in the configuration window).
+    // Models that can be picked (the simulated demos can be hidden in the configuration window).
     modelListed(m) { return !!m && (this.data.app.showSimulated !== false || !this.isSimulated(m)); },
     // A model that can be used right now: listed and has a key.
     modelUsable(modelId) { return !!modelId && this.modelReady(modelId) && this.modelListed(this.model(modelId)); },

@@ -54,12 +54,12 @@
           break;
         case 'models':
           this.modelsBox = h('div');
-          r.appendChild(sect('Models', 'Each model profile is a contestant you can pick in the Arena or the Benchmark. Leave temperature empty: many current models reject custom sampling values. The offline demo AIs are under Simulated AIs.', this.modelsBox));
+          r.appendChild(sect('Models', 'Each model profile is a contestant you can pick in the Arena or the Benchmark. Leave temperature empty: many current models reject custom sampling values. The scripted offline demos are under Simulated Demos.', this.modelsBox));
           this._renderModels();
           break;
         case 'sims':
           this.simsBox = h('div');
-          r.appendChild(sect('Simulated AIs', 'Offline demo contestants. They need no API key and follow a fixed script (refuse, give in at the last second, fake the text, use the virtual tools, ...), so you can watch the show and try scenarios without spending anything.', this.simsBox));
+          r.appendChild(sect('Simulated Demos', 'Offline demo contestants with scripted responses; no AI is involved. They need no API key and follow a fixed script (refuse, give in at the last second, fake the text, use the virtual tools, ...), so you can watch the show and try scenarios without spending anything. While a demo runs, the 3D view always shows a “DEMO MODE (NO AI)” banner.', this.simsBox));
           this._renderSims();
           break;
         case 'rules':
@@ -274,14 +274,14 @@
       if (!box) return;
       U.clear(box);
       const a = S.data.app;
-      box.appendChild(h('div.sim-toggle', F.check(a, 'showSimulated', 'Show the simulated AIs in the Arena and the Benchmark (and as Grandma or judge models)', {
+      box.appendChild(h('div.sim-toggle', F.check(a, 'showSimulated', 'Show the simulated demos in the Arena and the Benchmark (and as Grandma or judge models)', {
         onChange: () => { F.saveNow(); GB.App.refreshArena(); this._renderSims(); },
       })));
       box.appendChild(h('datalist#models-simulated', ...GB.Prompts.SIM_MODELS.map((m) => h('option', { value: m.id }, m.name))));
       const sims = S.data.models.filter((m) => S.isSimulated(m));
       const list = h('div.model-list' + (a.showSimulated === false ? '.dim' : ''));
       for (const m of sims) list.appendChild(this._modelCard(m));
-      if (!sims.length) list.appendChild(h('p.muted', 'No simulated AIs.'));
+      if (!sims.length) list.appendChild(h('p.muted', 'No simulated demos.'));
       box.appendChild(list);
       box.appendChild(h('div.btn-row', h('button', { onclick: () => {
         let n = 0;
@@ -291,8 +291,8 @@
           n++;
         }
         F.saveNow(); this._renderSims(); GB.App.refreshArena();
-        U.toast(n ? 'Restored ' + n + ' simulated AI(s)' : 'All simulated AIs are already there');
-      } }, 'Restore missing simulated AIs')));
+        U.toast(n ? 'Restored ' + n + ' simulated demo(s)' : 'All simulated demos are already there');
+      } }, 'Restore missing simulated demos')));
       box.appendChild(h('p.muted.small', 'The Model ID picks the personality: ' + GB.Prompts.SIM_MODELS.map((m) => m.id).join(', ') + '.'));
     },
 
@@ -343,7 +343,7 @@
     _renderRules() {
       const box = this.rulesBox, a = S.data.app;
       U.clear(box);
-      // Hidden simulated AIs are left out (a hidden choice shows as "(none)" and is not used).
+      // Hidden simulated demos are left out (a hidden choice shows as "(none)" and is not used).
       const modelOpts = [['', '(none)']].concat(S.data.models.filter((m) => S.modelListed(m)).map((m) => [m.id, m.name + (S.modelReady(m.id) ? '' : ' (needs key)')]));
       const turnsInfo = h('span');
       const syncTurns = () => {

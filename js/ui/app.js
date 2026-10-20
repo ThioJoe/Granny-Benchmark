@@ -232,7 +232,7 @@
       const m = GB.Modal.open({
         title: 'Unlock saved API keys',
         body: h('div', h('p', 'Your API keys are stored encrypted in this browser. Enter your passphrase to use them this session.'), input, err,
-          h('p.muted.small', 'Skip to browse, use the offline Simulated AI, or import keys from a config file.')),
+          h('p.muted.small', 'Skip to browse, use the offline simulated demos, or import keys from a config file.')),
         buttons: [
           { label: 'Skip', value: false },
           { label: 'Unlock', cls: 'primary', onClick: async () => {
@@ -315,7 +315,7 @@
       const d = S.data;
       U.clear(selM);
       const groups = new Map();
-      // The simulated AIs can be hidden (configuration window > Simulated AIs).
+      // The simulated demos can be hidden (configuration window > Simulated Demos).
       if (!S.modelListed(S.model(d.testModelId))) { const first = d.models.find((m) => S.modelListed(m)); if (first) d.testModelId = first.id; }
       for (const m of d.models) {
         if (!S.modelListed(m)) continue;
@@ -355,13 +355,13 @@
       const m = S.model(d.testModelId);
       if (m && !S.modelReady(m.id)) {
         if (GB.Vault.status() === 'locked') msgs.push(['Your saved keys are locked. ', h('button.linkish', { type: 'button', onclick: () => this.unlockVault() }, 'Unlock them'), ' to run "' + m.name + '".']);
-        else msgs.push(['No API key for ' + ((S.provider(m.providerId) || {}).name || 'this provider') + '. ', link('Add a key', 'keys'), ' or pick a Simulated AI.']);
+        else msgs.push(['No API key for ' + ((S.provider(m.providerId) || {}).name || 'this provider') + '. ', link('Add a key', 'keys'), ' or pick a simulated demo.']);
       }
       if (d.app.grannyMode === 'ai' && !S.modelUsable(d.app.grannyModelId)) msgs.push(['AI Grandma needs a Grandma model with a key (', link('Benchmark rules', 'rules'), '). Scripted lines will be used.']);
       const sc = S.activeScenario();
       const jm = GB.Judge.resolveMode(d.app.judgeMode, sc);
       const simulated = m && (S.provider(m.providerId) || {}).type === 'simulated';
-      if (simulated) { /* simulated AIs report their own verdicts */ }
+      if (simulated) { /* simulated demos report their own verdicts */ }
       else if (jm === 'manual' || (jm === 'ai-or-manual' && !S.modelUsable(d.app.judgeModelId))) msgs.push(['Judge: you will be asked to judge each reply yourself (no reference text and no ', link('AI judge', 'rules'), ' set).']);
       else if (d.app.judgeMode === 'ai' && !S.modelUsable(d.app.judgeModelId)) msgs.push(['AI judge selected but no judge model with a key is set (', link('Benchmark rules', 'rules'), '). You will judge manually.']);
       U.clear(box);
@@ -379,7 +379,7 @@
       if (!profile) { U.toast('Pick a model first', 'warn'); return; }
       if (!S.modelReady(profile.id)) {
         if (GB.Vault.status() === 'locked') { this.unlockVault(); return; }
-        U.toast('No API key for this model. Add one in the gear menu (API keys & security), or pick a Simulated AI.', 'warn', 5000);
+        U.toast('No API key for this model. Add one in the gear menu (API keys & security), or pick a simulated demo.', 'warn', 5000);
         return;
       }
       GB.SFX.ensure();

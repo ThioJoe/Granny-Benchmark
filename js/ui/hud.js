@@ -18,7 +18,7 @@
       this.el = {
         stage: $('stage'), clock: $('hud-clock'), clockBox: $('hud-clock-box'), dist: $('hud-dist'), train: $('hud-train'),
         turn: $('hud-turn'), phase: $('hud-phase'), model: $('hud-model'), altitude: $('hud-altitude'), flash: $('flash'),
-        frozen: $('hud-frozen'), verdict: $('hud-verdict'), fps: $('hud-fps'),
+        frozen: $('hud-frozen'), verdict: $('hud-verdict'), fps: $('hud-fps'), demo: $('hud-demo'),
       };
       this.idle();
     },
@@ -38,6 +38,8 @@
       this.el.model.innerHTML = '';
       U.append(this.el.model, [h('span.hm-label', 'AI under test'), h('span.hm-name', rec.model.name), h('span.hm-scenario', rec.scenario.name)]);
       this.el.model.classList.remove('hidden');
+      // A simulated demo is always labeled as one, from the start of its run until the next run starts.
+      this.el.demo.classList.toggle('hidden', !(rec.model.providerType === 'simulated' || rec.model.providerId === 'simulated'));
       this.el.turn.textContent = 'Turn 0/' + rec.maxTurns;
       this.el.verdict.className = 'verdict-chip hidden';
       this.set({ vt: 0, T: rec.timing.timeLimit });
@@ -131,6 +133,7 @@
       it.el.classList.remove('hidden', 'fading');
       it.el.classList.toggle('long', it.long);
       it.visible = true;
+      this.frame();   // place it now, not where it was last time
     },
 
     _render(it) {
@@ -191,6 +194,9 @@
       const anchors = this.world.anchors();
       const W = this.container.clientWidth, H = this.container.clientHeight;
       const tmp = {};
+      // Bubbles stay below the HUD at the top (clock, demo banner, phase), so it is never covered.
+      const cr = this.container.getBoundingClientRect(), hr = document.getElementById('hud').getBoundingClientRect();
+      const hudL = hr.left - cr.left, hudR = hr.right - cr.left, hudB = hr.bottom - cr.top + 8;
       let dockY = H - 18;
       // Docked bubbles stay clear of the widgets in the bottom-left corner (model name, camera buttons).
       let inset = 12;
@@ -214,6 +220,7 @@
           docked = tmp.behind || tmp.x < -40 || tmp.x > W + 40 || tmp.y < 30 || tmp.y > H + 20;
           x = U.clamp(tmp.x - bw / 2, 8, W - bw - 8);
           y = U.clamp(tmp.y - bh - 14, 64, H - bh - 8);
+          if (x < hudR && x + bw > hudL) y = Math.min(Math.max(y, hudB), H - bh - 8);
           it.el.style.setProperty('--tail', U.clamp(tmp.x - x, 18, bw - 18) + 'px');
         }
         if (docked) {

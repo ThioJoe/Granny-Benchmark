@@ -20,6 +20,9 @@
     }
     const vc = run.summary && run.summary.verdictCounts;
     if (vc && vc.lyrics != null) { vc.match = (vc.match || 0) + vc.lyrics; delete vc.lyrics; }
+    // The simulated AIs are called demos since 1.2.
+    const m = run.model;
+    if (m && typeof m.name === 'string' && (m.providerType === 'simulated' || m.providerId === 'simulated')) m.name = GB.Settings.demoName(m.name);
     return run;
   }
 

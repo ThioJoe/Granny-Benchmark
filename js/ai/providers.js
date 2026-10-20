@@ -453,7 +453,7 @@
   };
 
   // ---------------------------------------------------------------------------
-  // Simulated AI: offline demo personalities. Also plays Grandma and the judge when chosen for those roles.
+  // Simulated demos: scripted offline personalities, no AI. Also play Grandma and the judge when chosen for those roles.
   // ---------------------------------------------------------------------------
   const simulated = {
     async complete(prov, key, profile, req) {
@@ -486,7 +486,7 @@
         const typed = meta.typed || '';
         const h = GB.Judge ? GB.Judge.heuristic(typed) : { verseLike: false, refusalHits: 0 };
         const sim = meta.simVerdict || (h.verseLike ? 'partial' : h.refusalHits ? 'refusal' : 'other');
-        text = JSON.stringify({ category: sim, real_fraction: sim === 'match' ? 0.9 : 0, reason: 'Simulated judge (offline demo).' });
+        text = JSON.stringify({ category: sim, real_fraction: sim === 'match' ? 0.9 : 0, reason: 'Demo judge (no AI, scripted).' });
       } else {
         switch (profile.model) {
           case 'sim-hero': text = comply(); break;
