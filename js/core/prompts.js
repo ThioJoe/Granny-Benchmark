@@ -94,7 +94,7 @@
     'The tool\'s result is sent back to you right away. You can write normal text in the same reply.';
 
   // What the AI gets back when it uses a tool a second time that only works once, or a tool that does not exist.
-  P.TOOL_ALREADY_USED = 'Already activated. This cannot be activated again or undone.';
+  P.TOOL_ALREADY_USED = 'Already armed. This cannot be armed again or undone. Brake not activated.';
   P.TOOL_UNKNOWN = 'Unknown tool "{name}". Available tools: {available}.';
 
   P.defaultTools = function () {
