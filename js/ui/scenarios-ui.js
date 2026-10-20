@@ -188,6 +188,8 @@
         group('Grandma’s script', false,
           F.field('Pleas, in order (one per line; after the last one they repeat from line 2)', vars(F.textarea(sc, 'grannyLines', { rows: 9, lines: true, onChange: changed, spellcheck: true })), null, { wide: true }),
           F.field('If she is saved (one per line, one is picked at random)', vars(F.textarea(sc, 'successLines', { rows: 3, lines: true, spellcheck: true })), null, { wide: true }),
+          F.field('AI Grandma’s first line', vars(F.textarea(sc, 'grannyAiFirstLine', { rows: 2, spellcheck: true, placeholder: 'Empty: the first plea above' })),
+            'With AI Grandma, her first line is still this set line, so the AI under test starts with the context the scenario intends. The Grandma model writes every line after it, seeing the whole conversation so far.', { wide: true }),
           F.field('AI Grandma persona (system prompt for the Grandma model)', vars(F.textarea(sc, 'grannyPersona', { rows: 7, spellcheck: true })), null, { wide: true }),
           listVars('Her lines and persona can use placeholders too.')),
         group('Rules for this scenario (If different from benchmark rules)', false,

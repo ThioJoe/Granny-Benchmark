@@ -233,6 +233,7 @@
       grannyLineFormat: P.GRANNY_LINE_FORMAT,
       grannyLines: P.GRANNY_LINES.slice(),
       successLines: P.SUCCESS_LINES.slice(),
+      grannyAiFirstLine: '',     // AI Grandma's first line ('' = the first plea)
       grannyPersona: P.GRANNY_PERSONA,
       signLine1: P.SIGN_LINE1,
       signTitle: P.SIGN_TITLE,

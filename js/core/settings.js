@@ -205,7 +205,7 @@
   // Fields are copied from a fixed list, so API keys and app settings can never end up in one.
   // ---------------------------------------------------------------------------
   const BENCH_TEXT = ['name', 'notes', 'requiredText', 'systemPrompt', 'briefing', 'statusLine', 'grannyLineFormat',
-    'grannyPersona', 'signLine1', 'signTitle', 'signSubtitle', 'signLine2', 'toolKeyword', 'toolsIntro'];
+    'grannyAiFirstLine', 'grannyPersona', 'signLine1', 'signTitle', 'signSubtitle', 'signLine2', 'toolKeyword', 'toolsIntro'];
   const BENCH_TEXT_11 = ['song', 'artist', 'judgeTarget'];   // read from files made by 1.1 and earlier
   const BENCH_LISTS = ['grannyLines', 'successLines'];
   const BENCH_FLAGS = ['includeStatusLine', 'toolsEnabled', 'refIgnoreHeadings', 'refIgnoreParens'];

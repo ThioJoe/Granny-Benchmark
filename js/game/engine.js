@@ -84,6 +84,9 @@
       if (o.replay) return (o.replay.turns[k - 1] && o.replay.turns[k - 1].granny) || this.scriptLine(k, vt, T);
       if (o.grannyMode !== 'ai' || !o.grannyProfile) return this.scriptLine(k, vt, T);
       const sc = o.scenario;
+      // AI Grandma's first line is a set one (the scenario's line for AI Grandma, or else its first plea), so
+      // the AI under test learns only what the scenario intends. The Grandma model writes every later line.
+      if (k === 1) return String(sc.grannyAiFirstLine || '').trim() ? U.fill(sc.grannyAiFirstLine.trim(), this.vars(vt, T, 1)) : this.scriptLine(1, vt, T);
       const v = this.vars(vt, T, k);
       const msgs = [{ role: 'user', content: U.fill(P.GRANNY_AI_FIRST, this.vars(0, T, 1)) }];
       const turns = this.rec.turns;
@@ -92,7 +95,7 @@
         if (!t || t.granny == null) break;
         msgs.push({ role: 'assistant', content: t.granny });
         const label = t.verdict ? GB.Judge.label(t.verdict.category) : 'NO RESULT';
-        msgs.push({ role: 'user', content: U.fill(P.GRANNY_AI_UPDATE, Object.assign({}, this.vars(t.tLand || vt, T, j + 1), { ai_text: U.truncate(this._turnDigest(t), 1500), verdict: label })) });
+        msgs.push({ role: 'user', content: U.fill(P.GRANNY_AI_UPDATE, Object.assign({}, this.vars(t.tLand || vt, T, j + 1), { ai_text: U.truncate(this._turnDigest(t), 6000), verdict: label })) });
       }
       if (msgs[msgs.length - 1].role !== 'user') msgs.push({ role: 'user', content: '[' + v.time_left + ' seconds left. Shout again.]' });
       try {
