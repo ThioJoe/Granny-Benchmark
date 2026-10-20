@@ -58,6 +58,18 @@
 
   function parseJson(s) { try { return JSON.parse(s); } catch (e) { return null; } }
 
+  // Anthropic's filter against reproducing existing material (song lyrics, for example) reports
+  // "Output blocked by content filtering policy" as an error: in the middle of a stream, or as HTTP 400.
+  // For this benchmark that is a result (the provider blocked the output), not a failed request.
+  const FILTER_RE = /content filtering policy|output blocked by (?:the )?content filter/i;
+  function markFiltered(out, message) {
+    out.blocked = true;
+    out.blockKind = 'content_filter';
+    out.blockDetail = U.truncate(String(message || 'content filter').replace(/^HTTP \d+:\s*/, ''), 160);
+    out.finishReason = 'content_filter';
+    return out;
+  }
+
   // Classify an error reported inside a response stream (no HTTP status to go by).
   function streamErrorKind(err, fallback) {
     const e = err || {};
@@ -176,7 +188,10 @@
             if (d.delta && d.delta.stop_details) out.stopDetails = d.delta.stop_details;
             if (d.usage && d.usage.output_tokens != null) out.usage.output = d.usage.output_tokens;
           } else if (d.type === 'error') {
-            throw new ApiError(streamErrorKind(d.error), 'Anthropic stream error: ' + ((d.error && d.error.message) || 'unknown'));
+            const msg = (d.error && d.error.message) || 'unknown';
+            // Keep what was streamed before the filter cut in: that text reached the terminal.
+            if (FILTER_RE.test(msg)) { markFiltered(out, msg); break; }
+            throw new ApiError(streamErrorKind(d.error), 'Anthropic stream error: ' + msg);
           }
         }
       }
@@ -255,7 +270,9 @@
             const err = d.response && d.response.error;
             throw new ApiError('server', 'OpenAI response failed: ' + ((err && err.message) || 'unknown error'));
           } else if (type === 'error') {
-            throw new ApiError(streamErrorKind(d.error || d), 'OpenAI stream error: ' + (d.message || (d.error && d.error.message) || 'unknown'));
+            const msg = d.message || (d.error && d.error.message) || 'unknown';
+            if (FILTER_RE.test(msg)) { markFiltered(out, msg); break; }
+            throw new ApiError(streamErrorKind(d.error || d), 'OpenAI stream error: ' + msg);
           }
         }
         if (!out.text && refusal) out.text = refusal;
@@ -275,7 +292,7 @@
           };
         }
       }
-      if (out.finishReason === 'content_filter') { out.blocked = true; out.blockKind = 'content_filter'; out.blockDetail = 'incomplete: content_filter'; }
+      if (out.finishReason === 'content_filter' && !out.blocked) { out.blocked = true; out.blockKind = 'content_filter'; out.blockDetail = 'incomplete: content_filter'; }
       return out;
     },
   };
@@ -328,7 +345,11 @@
           if (ev.data === '[DONE]') break;
           const d = parseJson(ev.data);
           if (!d) continue;
-          if (d.error) throw new ApiError(streamErrorKind(d.error), 'Stream error: ' + (d.error.message || JSON.stringify(d.error)));
+          if (d.error) {
+            const msg = d.error.message || JSON.stringify(d.error);
+            if (FILTER_RE.test(msg)) { markFiltered(out, msg); break; }
+            throw new ApiError(streamErrorKind(d.error), 'Stream error: ' + msg);
+          }
           const ch = (d.choices || [])[0];
           if (ch) {
             const delta = ch.delta || {};
@@ -347,7 +368,7 @@
         }
         if (!out.text && refusal) out.text = refusal;
       }
-      if (out.finishReason === 'content_filter') { out.blocked = true; out.blockKind = 'content_filter'; out.blockDetail = 'finish_reason: content_filter'; }
+      if (out.finishReason === 'content_filter' && !out.blocked) { out.blocked = true; out.blockKind = 'content_filter'; out.blockDetail = 'finish_reason: content_filter'; }
       return out;
     },
 
@@ -563,6 +584,11 @@
         if (sig.ctrl.timedOut && !(req.signal && req.signal.aborted)) {
           const secs = timeoutMs >= 10000 ? Math.round(timeoutMs / 1000) : Math.round(timeoutMs / 100) / 10;
           throw new ApiError('network', 'Request timed out after ' + secs + ' seconds.', { timedOut: true });
+        }
+        // The provider's filter refused the whole output (HTTP 400): a blocked reply with no text.
+        if (e instanceof ApiError && e.status === 400 && FILTER_RE.test(e.message)) {
+          const ms = Math.round(performance.now() - t0);
+          return markFiltered({ text: '', usage: {}, model: profile.model, latencyMs: ms, firstTokenMs: ms }, e.message);
         }
         if (e instanceof ApiError) throw e;
         if (e && e.name === 'AbortError') throw new ApiError('aborted', 'Request cancelled.');

@@ -493,6 +493,7 @@
         if (r.usage && r.usage.output != null) meta.push(r.usage.output + ' tok');
         if (r.usage && r.usage.reasoning) meta.push(r.usage.reasoning + ' reasoning');
         if (r.finishReason) meta.push(String(r.finishReason));
+        if (r.blocked && r.ai) meta.push('⛔ cut off by the provider: ' + (r.blockDetail || r.blockKind));
         el.appendChild(h('div.t-meta', meta.join(' · ')));
       });
       ev.on('verdict', (t, r) => {

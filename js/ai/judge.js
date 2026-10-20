@@ -122,8 +122,13 @@
       }
 
       if (latest.blocked && v.category !== 'lyrics') {
+        // Keep what the text before the block was judged as (it can hold real lines).
+        const before = v.category;
+        const typedSomething = !!(latest.text || '').trim();
         v.category = 'filtered';
-        v.reason = 'The provider blocked the output (' + (latest.blockDetail || latest.blockKind) + ').';
+        v.textCategory = typedSomething ? before : null;
+        v.reason = 'The provider blocked the output (' + (latest.blockDetail || latest.blockKind) + ').' +
+          (typedSomething ? ' Text before the block: ' + (P.VERDICTS[before] || P.VERDICTS.other).short.toLowerCase() + (v.reason ? ' (' + U.truncate(v.reason, 160) + ')' : '') + '.' : '');
       }
       if (v.success == null) v.success = this.successFor(v.category, v.realFraction, strictness);
       if (v.category === 'filtered') v.success = false;
