@@ -527,7 +527,8 @@
       const onDelta = engine.show.aiDelta.bind(engine.show);
       engine.show.aiDelta = (full) => {
         onDelta(full);
-        if (cur) { cur.querySelector('.t-text').textContent = full; follow(); }
+        // A spoken reply appears whole when it is complete instead of being typed out as it arrives.
+        if (cur && engine.show.aiTypes) { cur.querySelector('.t-text').textContent = full; follow(); }
       };
       ev.on('ai', (t, r, logId) => {
         const el = cur;

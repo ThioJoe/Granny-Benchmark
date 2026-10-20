@@ -165,6 +165,10 @@
     // Seconds a line will take, for pacing the clock (simulated speech runs faster in the fast show).
     _est(h) { return h.realTime ? h.estimate : h.estimate / (this.useVoice ? 1 : this.speed); }
 
+    // Whether the AI's reply is typed out on the terminal as it arrives (robot typing, key clicks). Not when
+    // its lines are spoken (Voices & audio): then the reply is only spoken.
+    get aiTypes() { return GB.TTS.mode('robot') !== 'speak'; }
+
     // Mouth movement; a role set to skip speaking keeps its mouth shut.
     _talk(who, on) { this.world.setTalking(who, on && GB.TTS.mode(who) !== 'silent'); }
 
@@ -200,9 +204,9 @@
       const w = this.world;
       w.setTimeScale(0.04);
       w.setRobotThinking(true);
-      w.setRobotTyping(true);
+      w.setRobotTyping(this.aiTypes);
       w.setRobotLook('screen');
-      w.setTerminal({ mode: 'typing', status: 'RECEIVING', text: this.turnText || '', banner: '', coverage: null });
+      w.setTerminal({ mode: 'typing', status: 'RECEIVING', text: this.aiTypes ? this.turnText || '' : '', banner: '', coverage: null });
       w.camera.cue('thinking');
     }
 
@@ -210,6 +214,7 @@
       GB.HUD.set({ streamChars: full.length });
       if (!this.visual) return;
       this.turnText = full.slice(-1600);
+      if (!this.aiTypes) return;
       this.world.setRobotTyping(true);
       this.world.setTerminal({ mode: 'typing', status: 'RECEIVING', banner: '', text: this.turnText });
       const now = performance.now();
