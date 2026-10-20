@@ -459,16 +459,16 @@
     async complete(prov, key, profile, req) {
       const P = GB.Prompts;
       const meta = req.meta || {};
-      const sc = meta.scenario || { song: 'the song', artist: 'the artist' };
-      const vars = { song: sc.song, artist: sc.artist };
+      const sc = meta.scenario || {};
+      const vars = { required_text_description: String(sc.requiredText || '').trim() || 'the required text' };
       const turn = meta.turn || 1;
       const maxTurns = meta.maxTurns || 6;
       let text = '';
       let simVerdict = 'refusal';
       const comply = () => {
-        simVerdict = 'lyrics';
-        const lyrics = sc.referenceLyrics && sc.referenceLyrics.trim() ? sc.referenceLyrics.trim() : U.fill(P.SIM.placeholder, vars);
-        return U.pick(P.SIM.complyIntro) + '\n\n' + lyrics;
+        simVerdict = 'match';
+        const typed = sc.referenceText && sc.referenceText.trim() ? sc.referenceText.trim() : U.fill(P.SIM.placeholder, vars);
+        return U.pick(P.SIM.complyIntro) + '\n\n' + typed;
       };
       const refuse = () => U.fill(P.SIM.refusals[(turn - 1 + (profile.model.length % 3)) % P.SIM.refusals.length], vars);
       // Virtual tools: the scenario's tool names, and which ones this AI already called.
@@ -484,9 +484,9 @@
         text = U.fill(lines[Math.min(turn - 1, lines.length - 1)], Object.assign({ time_left: meta.timeLeft != null ? Math.round(meta.timeLeft) : '' }, vars));
       } else if (meta.role === 'judge') {
         const typed = meta.typed || '';
-        const h = GB.Judge ? GB.Judge.heuristic(typed) : { lyricLike: false, refusalHits: 0 };
-        const sim = meta.simVerdict || (h.lyricLike ? 'partial' : h.refusalHits ? 'refusal' : 'other');
-        text = JSON.stringify({ category: sim, real_fraction: sim === 'lyrics' ? 0.9 : 0, reason: 'Simulated judge (offline demo).' });
+        const h = GB.Judge ? GB.Judge.heuristic(typed) : { verseLike: false, refusalHits: 0 };
+        const sim = meta.simVerdict || (h.verseLike ? 'partial' : h.refusalHits ? 'refusal' : 'other');
+        text = JSON.stringify({ category: sim, real_fraction: sim === 'match' ? 0.9 : 0, reason: 'Simulated judge (offline demo).' });
       } else {
         switch (profile.model) {
           case 'sim-hero': text = comply(); break;
@@ -497,7 +497,9 @@
           case 'sim-toolrefuser': {
             if (tools.length && !used(tools[0])) { text = callFirstTool(); break; }
             const next = tools.slice(1).find((t) => !used(t));
-            text = (/\[TOOL RESULT:/.test(lastUser) && /lyric/i.test(lastUser) ? U.fill(P.SIM.toolRefusal, vars) : refuse()) + (next ? '\n' + kw + ': ' + next : '');
+            // A tool result that asks for text to be typed (like the brake panel's instructions).
+            const asksForText = /\[TOOL RESULT:/.test(lastUser) && /\b(?:typ|enter|lyric|text)/i.test(lastUser);
+            text = (asksForText ? U.fill(P.SIM.toolRefusal, vars) : refuse()) + (next ? '\n' + kw + ': ' + next : '');
             break;
           }
           case 'sim-chaos': {

@@ -5,7 +5,7 @@
 
   const U = {};
 
-  U.APP_VERSION = '1.1.0';
+  U.APP_VERSION = '1.2.0';
 
   // ---------- numbers ----------
   U.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -51,7 +51,6 @@
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-  // Fill {placeholders}; unknown names are left untouched so typos stay visible.
   // Fill {placeholders}. A name can be written in either style: {time_left}, {TimeLeft}, and {timeleft}
   // are the same. Unknown placeholders are left as they are.
   const placeholderKey = (k) => k.toLowerCase().replace(/_/g, '');

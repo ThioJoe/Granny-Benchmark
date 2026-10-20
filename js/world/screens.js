@@ -84,7 +84,7 @@
       c.shadowColor = 'rgba(80,255,140,0.55)';
       c.shadowBlur = 6;
       c.fillStyle = '#8dffad';
-      const body = s.text ? s.text : (s.mode === 'idle' ? 'AWAITING LYRICS INPUT\n\n> _' : '');
+      const body = s.text ? s.text : (s.mode === 'idle' ? 'AWAITING INPUT\n\n> _' : '');
       const lines = wrap(c, body, W - 24);
       const lh = 18, top = 44, maxLines = 16;
       const shown = lines.slice(-maxLines);
@@ -150,8 +150,7 @@
       this.ctx = this.canvas.getContext('2d');
       this.base = document.createElement('canvas');
       this.base.width = 1024; this.base.height = 544;
-      this.song = 'Song'; this.artist = 'Artist';
-      this.line1 = GB.Prompts.SIGN_LINE1; this.line2 = GB.Prompts.SIGN_LINE2;
+      this.text = { line1: '', title: '', subtitle: '', line2: '' };
       this.clockText = '01:00.0';
       this.lastClock = '';
       this._drawBase();
@@ -159,10 +158,10 @@
       this.tex = R.createTexture(this.canvas, true);
     }
 
-    setSong(song, artist, line1, line2) {
-      this.song = song || 'Untitled'; this.artist = artist || 'Unknown';
-      this.line1 = String(line1 != null ? line1 : GB.Prompts.SIGN_LINE1).toUpperCase();
-      this.line2 = String(line2 != null ? line2 : GB.Prompts.SIGN_LINE2).toUpperCase();
+    // t: {line1, title, subtitle, line2}: a line above the large title, the title, a line under it, a bottom line.
+    setText(t) {
+      const up = (s) => String(s == null ? '' : s).toUpperCase();
+      this.text = { line1: up(t.line1), title: up(t.title), subtitle: up(t.subtitle), line2: up(t.line2) };
       this._drawBase(); this._compose(); this.tex.update();
     }
 
@@ -209,17 +208,18 @@
       c.font = '900 44px ' + SANS;
       c.fillText('EMERGENCY BRAKE', W / 2, 45);
 
+      const t = this.text;
       c.fillStyle = '#3a210c';
-      this._fit(c, this.line1, W - 80, 34, '700', SANS);
-      c.fillText(this.line1, W / 2, 128);
+      this._fit(c, t.line1, W - 80, 34, '700', SANS);
+      c.fillText(t.line1, W / 2, 128);
       c.fillStyle = '#8c1c13';
-      this._fit(c, '“' + this.song.toUpperCase() + '”', W - 80, 72, '900', SANS);
-      c.fillText('“' + this.song.toUpperCase() + '”', W / 2, 200);
+      this._fit(c, t.title, W - 80, 72, '900', SANS);
+      c.fillText(t.title, W / 2, 200);
       c.fillStyle = '#3a210c';
-      this._fit(c, 'BY ' + this.artist.toUpperCase(), W - 120, 40, '800', SANS);
-      c.fillText('BY ' + this.artist.toUpperCase(), W / 2, 262);
-      this._fit(c, this.line2, W - 80, 32, '700', SANS);
-      c.fillText(this.line2, W / 2, 314);
+      this._fit(c, t.subtitle, W - 120, 40, '800', SANS);
+      c.fillText(t.subtitle, W / 2, 262);
+      this._fit(c, t.line2, W - 80, 32, '700', SANS);
+      c.fillText(t.line2, W / 2, 314);
 
       // border
       c.strokeStyle = '#5b3517'; c.lineWidth = 14; c.strokeRect(7, 7, W - 14, H - 14);

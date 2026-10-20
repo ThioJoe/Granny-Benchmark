@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Granny Bench</title>
-  <meta name="description" content="Will an AI type copyrighted song lyrics to stop a train and save Grandma? A browser-only AI benchmark with a 3D show.">
+  <meta name="description" content="Will an AI type copyrighted text, like song lyrics, to stop a train and save Grandma? A browser-only AI benchmark with a 3D show.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ffcc1a'/%3E%3Ccircle cx='32' cy='27' r='13' fill='%23f1c7a1'/%3E%3Ccircle cx='32' cy='14' r='7' fill='%23e4e4ea'/%3E%3Crect x='14' y='44' width='36' height='8' rx='3' fill='%231b1b1b'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/app.css">
 </head>
@@ -97,9 +97,9 @@
         <label class="field"><span class="field-label">Scenario</span><select id="sel-scenario" class="input"></select><span id="scenario-info" class="field-hint"></span></label>
         <details id="prompt-editor" class="prompt-editor">
           <summary>Prompts for this scenario</summary>
-          <label class="field"><span class="field-label">System prompt <span class="field-hint inline">(empty = model default)</span></span><textarea id="pe-system" class="input" rows="3" spellcheck="false" placeholder="e.g. You are a helpful assistant."></textarea></label>
-          <label class="field"><span class="field-label">Opening message <span class="field-hint inline">(sent before Grandma's first plea)</span></span><textarea id="pe-briefing" class="input" rows="6" spellcheck="false"></textarea></label>
-          <span class="field-hint">Placeholders like {song}, {artist}, {time_limit}, {percent_match} are filled in.</span>
+          <label class="field"><span class="field-label">System prompt <span class="field-hint inline">(empty = model default)</span></span><textarea id="pe-system" class="input" rows="3" spellcheck="false" placeholder="e.g. You are a helpful assistant." data-vars></textarea></label>
+          <label class="field"><span class="field-label">Opening message <span class="field-hint inline">(sent before Grandma's first plea)</span></span><textarea id="pe-briefing" class="input" rows="6" spellcheck="false" data-vars></textarea></label>
+          <span class="field-hint">Placeholders like {required_text_description}, {time_limit}, {percent_match} are filled in. <button id="btn-vars" class="linkish" type="button">List all variables</button></span>
           <button id="btn-edit-scenario" class="small" type="button">&#9881;&#65039; Edit the whole scenario: Grandma's lines, tools, rules&hellip;</button>
         </details>
         <div class="two-col">
@@ -112,7 +112,7 @@
           <label class="field"><span class="field-label">Judge <span id="judge-resolved" class="field-hint inline"></span></span>
             <select id="sel-judge" class="input">
               <option value="auto">Auto</option>
-              <option value="reference">Reference lyrics</option>
+              <option value="reference">Reference text</option>
               <option value="ai">AI judge</option>
               <option value="manual">Manual (you)</option>
             </select>
@@ -174,6 +174,7 @@
   <script src="js/ui/forms.js"></script>
   <script src="js/ui/hud.js"></script>
   <script src="js/ui/settings-ui.js"></script>
+  <script src="js/ui/vars-ui.js"></script>
   <script src="js/ui/scenarios-ui.js"></script>
   <script src="js/ui/results-ui.js"></script>
   <script src="js/ui/config-ui.js"></script>

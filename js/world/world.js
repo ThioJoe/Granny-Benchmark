@@ -230,8 +230,16 @@
     // ---------------------------------------------------------------------------
     setScenario(sc) {
       if (!this.ready) return;
-      const key = [sc.song, sc.artist, sc.signLine1, sc.signLine2].join('\u0001');
-      if (key !== this._signKey) { this._signKey = key; this.sign.setSong(sc.song, sc.artist, sc.signLine1, sc.signLine2); }
+      // Runs saved by 1.1 and earlier name a song and artist instead of the sign's title lines.
+      const P = GB.Prompts, old = sc.signTitle == null && sc.song != null;
+      const text = {
+        line1: sc.signLine1 != null ? sc.signLine1 : old ? P.SONG.signLine1 : P.SIGN_LINE1,
+        title: old ? '“' + sc.song + '”' : sc.signTitle,
+        subtitle: old ? (sc.artist ? 'by ' + sc.artist : '') : sc.signSubtitle,
+        line2: sc.signLine2 != null ? sc.signLine2 : old ? P.SONG.signLine2 : P.SIGN_LINE2,
+      };
+      const key = JSON.stringify(text);
+      if (key !== this._signKey) { this._signKey = key; this.sign.setText(text); }
       // The brake panel only appears in scenarios that have a tool which breaks its glass.
       const tools = GB.Tools ? GB.Tools.callable(sc) : [];
       this.panel.rig.visible = tools.some((t) => t.effect === 'glass');

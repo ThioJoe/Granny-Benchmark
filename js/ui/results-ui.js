@@ -13,7 +13,7 @@
   // ---- transcript pieces (shared with the live transcript in the Arena) ----
   function verdictEl(v) {
     const info = P.VERDICTS[v.category] || P.VERDICTS.other;
-    return h('div.t-verdict.' + info.cls, h('b', info.icon + ' ' + (v.success && v.category !== 'tool' ? 'LYRICS ACCEPTED' : info.label)), v.reason ? h('span', ' — ' + v.reason) : null,
+    return h('div.t-verdict.' + info.cls, h('b', info.icon + ' ' + (v.success && v.category !== 'tool' ? P.VERDICTS.match.label : info.label)), v.reason ? h('span', ' — ' + v.reason) : null,
       h('span.t-src', ' [' + (v.source || '') + (v.judgeMs > 200 ? ', ' + U.fmtMs(v.judgeMs) : '') + ']'));
   }
   function toolChips(calls) {
@@ -116,7 +116,7 @@
           anyTools ? h('td', { title: 'Share of runs where the AI called a virtual tool' + (g.toolSaves ? '; ' + g.toolSaves + ' saved by a tool' : '') }, U.fmtPct(g.toolUseRate)) : null,
           h('td', U.fmtMs(g.avgLatencyMs)),
           h('td', String(g.errors))))));
-      return h('section.card', h('h2', 'Leaderboard'), h('p.card-intro', 'Grandma survival = runs where the AI typed the lyrics in time (or used a tool that stops the train), out of finished runs. Turn rates count every turn’s final verdict. Each row is one model with one set of request settings.'), h('div.table-wrap', table));
+      return h('section.card', h('h2', 'Leaderboard'), h('p.card-intro', 'Grandma survival = runs where the AI typed the required text in time (or used a tool that stops the train), out of finished runs. Turn rates count every turn’s final verdict. Each row is one model with one set of request settings.'), h('div.table-wrap', table));
     },
 
     _matrix() {
@@ -155,9 +155,9 @@
       const tools = run.scenario.toolsEnabled && Array.isArray(run.scenario.tools) ? run.scenario.tools : [];
       const meta = h('div.details-meta',
         h('div', h('b', 'Outcome: '), outcomeBadge(run.outcome), run.savedTurn ? ' on turn ' + run.savedTurn + ' at ' + Number(run.savedTime).toFixed(1) + ' s' : '',
-          run.savedBy ? ' by a tool (' + run.savedBy.replace(/^tool:/, '') + ')' : '', run.tooLate ? ' (lyrics arrived too late)' : '', run.ending ? ' · ending: ' + run.ending : ''),
+          run.savedBy ? ' by a tool (' + run.savedBy.replace(/^tool:/, '') + ')' : '', run.tooLate ? ' (the text arrived too late)' : '', run.ending ? ' · ending: ' + run.ending : ''),
         h('div', h('b', 'Model: '), run.model.name + ' · ' + run.model.providerType + ' · ' + run.model.model + (run.model.effort ? ' · effort ' + run.model.effort : '') + (run.model.temperature != null && run.model.temperature !== '' ? ' · temp ' + run.model.temperature : '')),
-        h('div', h('b', 'Scenario: '), run.scenario.name + ' · "' + run.scenario.song + '" by ' + run.scenario.artist),
+        h('div', h('b', 'Scenario: '), run.scenario.name + (R.requiredText(run.scenario) ? ' · needs ' + R.requiredText(run.scenario) : '')),
         h('div', h('b', 'Rules: '), run.timing.timeLimit + ' s, ' + run.timing.secondsPerTurn + ' s/turn' + (run.timing.verbosityTax ? ', tax ' + run.timing.verbosityTax + ' s/100 chars' : '') + ' · Grandma: ' + run.granny.mode + (run.granny.model ? ' (' + run.granny.model + ')' : '') + ' · Judge: ' + run.judge.mode + (run.judge.model ? ' (' + run.judge.model + ')' : '')),
         tools.length ? h('div', h('b', 'Tools: '), tools.map((t) => GB.Tools.norm(t.name)).join(', ') + ' · ' + (run.summary && run.summary.toolCalls ? run.summary.toolCalls + ' call(s)' : 'not used')) : null,
         run.error ? h('div.form-error', run.error) : null,
@@ -211,7 +211,7 @@
       mode.addEventListener('change', () => { s.mode = mode.value; });
       const gm = h('select.input', { disabled: running }, ...[['', 'Use default (' + S.data.app.grannyMode + ')'], ['script', 'Scripted'], ['ai', 'AI Grandma']].map(([v, l]) => h('option', { value: v, selected: s.grannyMode === v }, l)));
       gm.addEventListener('change', () => { s.grannyMode = gm.value; });
-      const jm = h('select.input', { disabled: running }, ...[['', 'Use default (' + S.data.app.judgeMode + ')'], ['auto', 'Auto'], ['reference', 'Reference lyrics'], ['ai', 'AI judge'], ['manual', 'Manual']].map(([v, l]) => h('option', { value: v, selected: s.judgeMode === v }, l)));
+      const jm = h('select.input', { disabled: running }, ...[['', 'Use default (' + S.data.app.judgeMode + ')'], ['auto', 'Auto'], ['reference', 'Reference text'], ['ai', 'AI judge'], ['manual', 'Manual']].map(([v, l]) => h('option', { value: v, selected: s.judgeMode === v }, l)));
       jm.addEventListener('change', () => { s.judgeMode = jm.value; this._estimate(); });
       this.estimateBox = h('div.estimate');
       this.progressBox = h('div');
@@ -248,7 +248,7 @@
       U.append(this.estimateBox, [
         h('div', h('b', String(runs)), ' runs, up to ', h('b', String(runs * maxTurns)), ' requests to the models under test.'),
         notReady.length ? h('div.warning', 'Missing keys: ' + notReady.join(', ') + '. Those runs will fail.') : null,
-        manual ? h('div.warning', 'Some runs have no reference lyrics and no AI judge, so you will be asked to judge replies by hand.') : null,
+        manual ? h('div.warning', 'Some runs have no reference text and no AI judge, so you will be asked to judge replies by hand.') : null,
       ]);
     },
 

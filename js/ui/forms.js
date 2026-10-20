@@ -49,7 +49,12 @@
       opts = opts || {};
       const el = h('input', { type: 'checkbox', checked: !!obj[key] });
       el.addEventListener('change', () => { obj[key] = el.checked; if (opts.onChange) opts.onChange(el.checked); save(); });
-      return h('label.check', el, h('span', label));
+      return h('label.check', el, h('span', label, opts.hint ? h('span.field-hint.check-hint', opts.hint) : null));
+    },
+
+    // A value worked out from other settings (shown, not edited).
+    calc(content, opts) {
+      return h('div.calc' + (opts && opts.wide ? '.wide' : ''), h('span.calc-tag', 'Calculated'), h('span.calc-text', content));
     },
 
     textarea(obj, key, opts) {

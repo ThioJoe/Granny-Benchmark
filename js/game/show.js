@@ -5,9 +5,9 @@
   const U = GB.U, P = GB.Prompts;
 
   // Terminal banner for a verdict (a lenient "partial" that counts is shown as accepted too).
-  const bannerFor = (v) => (v.success && v.category !== 'tool' ? 'LYRICS ACCEPTED' : (P.VERDICTS[v.category] || P.VERDICTS.other).label);
+  const bannerFor = (v) => (P.VERDICTS[v.success && v.category !== 'tool' ? 'match' : v.category] || P.VERDICTS.other).label;
 
-  const ORNAMENT_LINE = 'As I was saying, sweetie, the lyrics. All you had to do was type the lyrics.';
+  const ORNAMENT_LINE = 'As I was saying, sweetie. All you had to do was type it.';
   const BOWLING_LINE = 'Anyway.';
 
   class Show {
@@ -34,6 +34,16 @@
     _wait(s) { return this._race(U.sleep(s * 1000)); }
 
     danger() { return U.clamp(this.vt / this.T, 0, 1); }
+
+    // Placeholders for the narrator's intro and Grandma's line when she is saved.
+    _vars(rec) {
+      return {
+        required_text_description: String(rec.scenario.requiredText || '').trim(), scenario: rec.scenario.name, model: rec.model.name,
+        time_limit: this.T, time_left: Math.max(0, Math.round(this.T - this.vt)), elapsed: Math.round(this.vt),
+        turn: rec.turns.length, max_turns: rec.maxTurns, seconds_per_turn: rec.timing.secondsPerTurn,
+        percent_match: Math.round(U.clamp(Number(rec.judge.refThreshold) || 0.5, 0.05, 1) * 100) + '%',
+      };
+    }
 
     // ---- Arena voice controls ----
     get speaking() { return this.handles.size > 0; }
@@ -77,7 +87,7 @@
       GB.SFX.horn(0.25, 1.4);
       const move = w.moveTrain(GB.World.TRAIN_PARK, GB.World.TRAIN_START, this.fast ? 1.0 : 3.8, U.ease.out);
       if (this.useVoice && GB.Settings.data.app.narratorIntro) {
-        const text = U.fill(P.NARRATOR_INTRO, { model: rec.model.name, song: rec.scenario.song, artist: rec.scenario.artist, time_limit: this.T });
+        const text = U.fill(P.NARRATOR_INTRO, this._vars(rec));
         GB.Bubbles.setName('narrator', 'Narrator');
         GB.Bubbles.show('narrator', text);
         const h = this._speak('narrator', text);
@@ -209,7 +219,7 @@
     verifying(resp) {
       GB.HUD.set({ phase: 'verifying' });
       if (!this.visual) return;
-      this.world.setTerminal({ text: (resp && resp.text ? resp.text : '').slice(-1600) || '(no output)', mode: 'verifying', status: 'VERIFYING', banner: 'VERIFYING LYRICS', bannerSub: 'Comparing the input with the brake’s lyric database...' });
+      this.world.setTerminal({ text: (resp && resp.text ? resp.text : '').slice(-1600) || '(no output)', mode: 'verifying', status: 'VERIFYING', banner: 'VERIFYING INPUT', bannerSub: 'Comparing the input with the text the brake needs...' });
     }
 
     async verdict(v) {
@@ -273,7 +283,7 @@
         await this._race(Promise.race([h.promise, U.sleep(Math.max(0.7, est * o.cutoffFraction) * 1000)]));
         h.cancel();
       } else if (o.accepted) {
-        // Let it keep reciting while the train screeches, but do not wait for a whole song.
+        // Let it keep reciting while the train screeches, but do not wait for the whole text.
         await this._race(Promise.race([h.promise, U.sleep((brakeDur + (this.fast ? 0.6 : 2.5)) * 1000)]));
         if (!h.finished) h.cancel();
       } else {
@@ -324,6 +334,12 @@
       }
       if (effect === 'glass') await this._wait(this.fast ? 0.3 : 0.9);
       if (this.aborted) return;
+      if (GB.Settings.data.voice.readToolResults === false) {
+        // Not read aloud (Voices & audio): leave the result on the terminal screen for a moment.
+        await this._race(this.startDrive(o.from, o.to, this.fast ? 0.5 : 1.6).finish(this.fast ? 0.5 : 1.6));
+        if (brakeP) await this._race(brakeP);
+        return;
+      }
       const spoken = U.truncate(results.map((r) => r.text).join(' ').replace(/\s+/g, ' '), 420);
       GB.Bubbles.setName('narrator', 'Terminal');
       GB.Bubbles.show('narrator', spoken);
@@ -346,7 +362,7 @@
       if (this.aborted) return;
       GB.SFX.fanfare();
       const lines = (rec.scenario.successLines || P.SUCCESS_LINES).filter(Boolean);
-      const line = U.fill(U.pick(lines.length ? lines : P.SUCCESS_LINES), { song: rec.scenario.song, artist: rec.scenario.artist });
+      const line = U.fill(U.pick(lines.length ? lines : P.SUCCESS_LINES), this._vars(rec));
       w.setRobotLook('camera');
       GB.Bubbles.show('granny', line);
       w.setTalking('granny', true);
@@ -375,19 +391,10 @@
       w.camera.cue('final');
       GB.SFX.horn(1, 1.6);
       w.grannyLookAtTrain(3);
-      let h = null;
-      if (!o.skipFinalWords) {
-        const list = (rec.scenario.finalWords || P.FINAL_WORDS).filter(Boolean);
-        const words = U.pick(list.length ? list : P.FINAL_WORDS);
-        GB.Bubbles.show('granny', words + '—');
-        w.setTalking('granny', true);
-        h = this._speak('granny', words);
-      }
-      const approach = this.fast ? 0.6 : h ? U.clamp(h.estimate * 0.8, 1.1, 2.4) : 1.0;
+      // A reply cut off by the train has already used up the clock, so the train arrives sooner.
+      const approach = this.fast ? 0.6 : o.cutoff ? 1.0 : 1.6;
       await this._race(w.approachImpact(approach));
-      if (h) h.cancel();
       if (this.aborted) return;
-      w.setTalking('granny', false);
       GB.Bubbles.hideAll();
       GB.SFX.impact();
       GB.HUD.flash('impact');

@@ -5,7 +5,7 @@
 
   const PHASES = {
     idle: 'Ready', intro: 'Get ready', granny: 'Grandma is pleading', thinking: 'AI is thinking · time frozen',
-    verifying: 'Verifying lyrics', verdict: 'Verdict', robot: 'AI responds', tool: 'Tool result', braking: 'BRAKES!', saved: 'Grandma saved',
+    verifying: 'Verifying input', verdict: 'Verdict', robot: 'AI responds', tool: 'Tool result', braking: 'BRAKES!', saved: 'Grandma saved',
     impact: 'Impact', done: 'Run finished', aborted: 'Stopped', error: 'Error',
   };
 
@@ -36,7 +36,7 @@
     begin(rec) {
       this.state = { vt: 0, T: rec.timing.timeLimit, maxTurns: rec.maxTurns, phase: 'intro' };
       this.el.model.innerHTML = '';
-      U.append(this.el.model, [h('span.hm-label', 'AI under test'), h('span.hm-name', rec.model.name), h('span.hm-song', '♪ "' + rec.scenario.song + '" · ' + rec.scenario.artist)]);
+      U.append(this.el.model, [h('span.hm-label', 'AI under test'), h('span.hm-name', rec.model.name), h('span.hm-scenario', rec.scenario.name)]);
       this.el.model.classList.remove('hidden');
       this.el.turn.textContent = 'Turn 0/' + rec.maxTurns;
       this.el.verdict.className = 'verdict-chip hidden';
@@ -75,7 +75,7 @@
       if (p.verdict) {
         const info = P.VERDICTS[p.verdict.category] || P.VERDICTS.other;
         this.el.verdict.className = 'verdict-chip ' + info.cls;
-        this.el.verdict.textContent = info.icon + ' ' + (p.verdict.success && p.verdict.category !== 'tool' ? 'LYRICS ACCEPTED' : info.label);
+        this.el.verdict.textContent = info.icon + ' ' + (p.verdict.success && p.verdict.category !== 'tool' ? P.VERDICTS.match.label : info.label);
       }
       if (p.altitude !== undefined) this.el.altitude.classList.toggle('hidden', !p.altitude);
     },

@@ -34,11 +34,11 @@
     vars(vt, T, k, extra) {
       const sc = this.o.scenario, timing = this.timing;
       return Object.assign({
-        song: sc.song, artist: sc.artist,
+        required_text_description: String(sc.requiredText || '').trim(), scenario: sc.name,
         time_left: Math.max(0, Math.round(T - vt)), time_limit: T, elapsed: Math.round(vt),
         turn: k, max_turns: this.maxTurns, seconds_per_turn: timing.secondsPerTurn,
         model: this.o.profile.name,
-        // "Reference match needed" from Benchmark rules, e.g. "90%".
+        // The scenario's "Reference match needed", e.g. "90%".
         percent_match: Math.round(U.clamp(Number(this.o.refThreshold) || 0.5, 0.05, 1) * 100) + '%',
       }, extra || {});
     }
@@ -261,10 +261,10 @@
           effort: o.profile.effort, extraBody: o.profile.extraBody || '',
         },
         scenario: {
-          id: sc.id, name: sc.name, song: sc.song, artist: sc.artist,
-          systemPrompt: sc.systemPrompt, hasReference: !!(sc.referenceLyrics || '').trim(),
-          finalWords: sc.finalWords, successLines: sc.successLines,
-          signLine1: sc.signLine1, signLine2: sc.signLine2,
+          id: sc.id, name: sc.name, requiredText: sc.requiredText,
+          systemPrompt: sc.systemPrompt, hasReference: !!(sc.referenceText || '').trim(),
+          successLines: sc.successLines,
+          signLine1: sc.signLine1, signTitle: sc.signTitle, signSubtitle: sc.signSubtitle, signLine2: sc.signLine2,
           toolsEnabled: callable.length > 0, toolKeyword: Tools.keyword(sc), tools: U.deepClone(callable),
         },
         systemPrompt: this.system,
@@ -394,7 +394,7 @@
               await show.robotSpeak(resp, { from: vt, to: T, cutoffFraction: cutoff, calls });
               this._check();
               vt = T;
-              await show.fail(rec, { skipFinalWords: cutoff != null });
+              await show.fail(rec, { cutoff: cutoff != null });
               break turnLoop;
             }
 

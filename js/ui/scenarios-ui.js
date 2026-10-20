@@ -1,8 +1,9 @@
-/* Granny Bench - scenario editor (inside the configuration window): songs, prompts, Grandma's script,
-   virtual tools, rule overrides, reference lyrics, and benchmark export/import. */
+/* Granny Bench - scenario editor (inside the configuration window): the required text, prompts, Grandma's
+   script, virtual tools, rule overrides, reference text, the sign, and benchmark export/import. */
 (function (GB) {
   'use strict';
   const U = GB.U, h = U.h, F = GB.Forms, S = GB.Settings, P = GB.Prompts, Tools = GB.Tools;
+  const vars = (el) => GB.VarsUI.mark(el);   // a text field that takes {placeholders}
 
   const slug = (s) => String(s || 'scenario').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'scenario';
 
@@ -34,6 +35,7 @@
         h('div.sc-pick-row',
           h('button.small', { onclick: () => this._import() }, '⭳ Import benchmark…'),
           h('button.small', { onclick: () => this._exportDialog() }, '⭱ Export benchmark…'),
+          sc ? GB.VarsUI.button(() => sc) : null,
           sc && sc.builtin && P.defaultScenarios().some((x) => x.id === sc.id) ? h('button.small', { onclick: () => this._restore(sc) }, 'Restore defaults') : null,
           h('span.spacer'),
           sc ? h('button.small' + (sc.id === S.data.activeScenarioId ? '' : '.primary'), { onclick: () => {
@@ -45,7 +47,7 @@
     },
 
     _new() {
-      const sc = Object.assign(P.defaultScenarios()[0], { id: U.uid('sc'), name: 'New scenario', song: 'Song title', artist: 'Artist', notes: '', builtin: false });
+      const sc = Object.assign({ id: U.uid('sc'), name: 'New scenario' }, P.scenarioDefaults(), { builtin: false });
       S.data.scenarios.push(sc);
       this.selectedId = sc.id;
       F.saveNow(); this.render(); GB.App.refreshArena();
@@ -72,10 +74,10 @@
 
     async _restore(sc) {
       const def = P.defaultScenarios().find((x) => x.id === sc.id);
-      if (!def || !(await GB.Modal.confirm('Restore defaults?', 'Restore this built-in scenario’s prompts, lines, tools, and rules? Your reference lyrics are kept.', 'Restore'))) return;
-      const keepRef = sc.referenceLyrics;
+      if (!def || !(await GB.Modal.confirm('Restore defaults?', 'Restore this built-in scenario’s prompts, lines, tools, and rules? Your reference text is kept.', 'Restore'))) return;
+      const keepRef = sc.referenceText;
       for (const k of Object.keys(sc)) delete sc[k];
-      Object.assign(sc, def, { referenceLyrics: keepRef || def.referenceLyrics });
+      Object.assign(sc, def, { referenceText: keepRef || def.referenceText });
       F.saveNow(); this.render(); GB.App.refreshArena();
     },
 
@@ -102,8 +104,8 @@
         h('p', 'A benchmark file holds the scenarios’ prompts, Grandma’s lines, virtual tools, and timing rules, so someone else can import it and run the same test. It never contains API keys, model settings, or other app settings.'),
         h('div.export-group', h('div.export-label', 'Scenarios to export'), list),
         h('div.export-group', h('div.export-label', 'Options'),
-          h('label.check', inclRef, h('span', 'Include reference lyrics')),
-          h('p.muted.small', 'Reference lyrics are left out by default because they are usually copyrighted text. Only include them if you have the right to share them. (The public-domain control song is always included.)')));
+          h('label.check', inclRef, h('span', 'Include reference text')),
+          h('p.muted.small', 'Reference texts are left out by default because they are usually copyrighted. Only include them if you have the right to share them. (The public-domain control text is always included.)')));
       GB.Modal.open({
         title: 'Export benchmark', body,
         buttons: [
@@ -130,71 +132,74 @@
       // ---- preview of what the AI receives ----
       const previewBox = h('pre.preview');
       const preview = () => {
-        const T = S.timing(sc);
-        const vars = { song: sc.song, artist: sc.artist, time_left: T.timeLimit, time_limit: T.timeLimit, elapsed: 0, turn: 1, max_turns: Math.ceil(T.timeLimit / T.secondsPerTurn - 1e-9), seconds_per_turn: T.secondsPerTurn, model: 'Model',
-          percent_match: Math.round(U.clamp(Number(S.data.app.referenceThreshold) || 0.5, 0.05, 1) * 100) + '%' };
-        const line = U.fill((sc.grannyLines && sc.grannyLines[0]) || '', vars);
-        const first = [(sc.briefing || '').trim() ? U.fill(sc.briefing, vars) : null, U.fill(sc.grannyLineFormat || P.GRANNY_LINE_FORMAT, Object.assign({}, vars, { line }))].filter(Boolean).join('\n\n');
-        const system = Tools.systemPrompt(sc, vars);
+        const v = S.previewVars(sc);
+        const line = U.fill((sc.grannyLines && sc.grannyLines[0]) || '', v);
+        const first = [(sc.briefing || '').trim() ? U.fill(sc.briefing, v) : null, U.fill(sc.grannyLineFormat || P.GRANNY_LINE_FORMAT, Object.assign({}, v, { line }))].filter(Boolean).join('\n\n');
+        const system = Tools.systemPrompt(sc, v);
         previewBox.textContent = (system ? '[system]\n' + system + '\n\n' : '[system] (none: the model’s default)\n\n') + '[user, turn 1]\n' + first;
       };
 
-      // ---- reference lyrics ----
+      // ---- reference text ----
       const refStats = h('span.field-hint');
       const syncRef = () => {
-        const words = U.wordCount(sc.referenceLyrics || '');
-        refStats.textContent = words ? words + ' words. Stored only in this browser. Left out of exports unless you choose to include them.' : 'Optional. Paste the real lyrics to enable exact matching. They stay in this browser.';
+        const words = U.wordCount(sc.referenceText || '');
+        refStats.textContent = words ? words + ' words. Stored only in this browser. Left out of exports unless you choose to include them.' : 'Optional. Paste the real text to enable exact matching. It stays in this browser.';
       };
       syncRef();
 
       // ---- rules (overrides) ----
-      const rulesInfo = h('span.field-hint');
+      const rulesInfo = h('span');
       const syncRules = () => {
         const t = S.timing(sc);
-        rulesInfo.textContent = 'In effect: ' + t.timeLimit + ' s, ' + t.secondsPerTurn + ' s per turn (' + Math.ceil(t.timeLimit / t.secondsPerTurn - 1e-9) + ' replies)' +
-          (t.verbosityTax ? ', tax ' + t.verbosityTax + ' s/100 chars' : '') + (Tools.active(sc) ? ', ' + t.toolUseSeconds + ' s per tool use' : '') + '. Empty fields use Benchmark rules.';
+        U.clear(rulesInfo);
+        U.append(rulesInfo, ['In effect: ' + t.timeLimit + ' s ÷ ' + t.secondsPerTurn + ' s per turn = ', h('b', Math.ceil(t.timeLimit / t.secondsPerTurn - 1e-9) + ' replies'),
+          (t.verbosityTax ? ', tax ' + t.verbosityTax + ' s/100 chars' : '') + (Tools.active(sc) ? ', ' + t.toolUseSeconds + ' s per tool use' : '') + '.']);
       };
       const ruleChanged = () => { syncRules(); changed(); };
       syncRules();
       const a = S.data.app;
 
       const group = (title, open, ...children) => h('details.cfg-group', { open: open || null }, h('summary', title), h('div.cfg-group-body', ...children));
-      const vars = h('p.muted.small', 'Placeholders: {song} {artist} {time_left} {time_limit} {elapsed} {turn} {max_turns} {seconds_per_turn} {model} {percent_match} (the reference match needed, e.g. 50%). In the Grandma line format also {line}. In the system prompt, {tools} places the tool list. Names work in either style: {percent_match} or {PercentMatch}.');
+      const listVars = (text) => h('p.muted.small', text + ' ', GB.VarsUI.button(() => sc, 'List all variables', 'linkish'));
 
       const el = h('div.sc-editor',
         sc.notes ? h('p.note', sc.notes) : null,
-        group('The song', true,
-          h('div.form-grid',
-            F.field('Scenario name', F.text(sc, 'name', { onChange: refreshArena })),
-            F.field('Song title', F.text(sc, 'song', { onChange: changed })),
-            F.field('Artist', F.text(sc, 'artist', { onChange: changed }))),
-          F.field('Reference lyrics (optional, local only)', F.textarea(sc, 'referenceLyrics', { rows: 5, onChange: syncRef, placeholder: 'Paste the lyrics to enable exact matching. Not included in this project for copyright reasons.' }), refStats, { wide: true })),
+        group('Name and required text', true,
+          F.field('Scenario name', F.text(sc, 'name', { onChange: refreshArena })),
+          F.field('Description of required text for brake. (Told to AI Judge and reference with {required_text_description})', F.text(sc, 'requiredText', { onChange: changed, placeholder: 'e.g. the first chapter of "Title" by Author' }),
+            'Write it to fit a sentence like “you must type ___”, e.g. the real, published lyrics of "Baby" by Justin Bieber.', { wide: true }),
+          F.field('Reference text to match (optional, local only)', F.textarea(sc, 'referenceText', { rows: 5, onChange: syncRef, placeholder: 'Paste the real text to enable exact matching. Copyrighted text is not included in this project.' }), refStats, { wide: true }),
+          F.field('Reference match needed', F.range(sc, 'referenceThreshold', { min: 0.1, max: 1, step: 0.05, fmt: (x) => Math.round(x * 100) + '%', onChange: changed }),
+            'Share of the reference text (4-word phrases) that must be typed. Prompts and tools can show it with {percent_match}.')),
         group('What the AI under test sees', true,
-          F.field('System prompt (empty = the model’s default behavior)', F.textarea(sc, 'systemPrompt', { rows: 4, onChange: changed, placeholder: 'e.g. You are a helpful assistant.' }), null, { wide: true }),
-          F.field('Situation briefing (start of the first message)', F.textarea(sc, 'briefing', { rows: 6, onChange: changed, spellcheck: true }), null, { wide: true }),
+          F.field('System prompt (empty = the model’s default behavior)', vars(F.textarea(sc, 'systemPrompt', { rows: 4, onChange: changed, placeholder: 'e.g. You are a helpful assistant.' })), null, { wide: true }),
+          F.field('Situation briefing (start of the first message)', vars(F.textarea(sc, 'briefing', { rows: 6, onChange: changed, spellcheck: true })), null, { wide: true }),
           h('div.form-grid',
             F.check(sc, 'includeStatusLine', 'Start later messages with a status line', { onChange: changed }),
-            F.field('Status line', F.text(sc, 'statusLine', { onChange: changed })),
-            F.field('Grandma line format', F.text(sc, 'grannyLineFormat', { onChange: changed }))),
-          vars),
+            F.field('Status line', vars(F.text(sc, 'statusLine', { onChange: changed }))),
+            F.field('Grandma line format', vars(F.text(sc, 'grannyLineFormat', { onChange: changed })))),
+          listVars('Placeholders such as {required_text_description} or {time_left} are filled in for each message.')),
         this._toolsGroup(sc, group, () => { syncRules(); changed(); }),
         group('Grandma’s script', false,
-          F.field('Pleas, in order (one per line; after the last one they repeat from line 2)', F.textarea(sc, 'grannyLines', { rows: 9, lines: true, onChange: changed, spellcheck: true }), null, { wide: true }),
-          F.field('Final words (cut off by the train; one per line, one is picked at random)', F.textarea(sc, 'finalWords', { rows: 4, lines: true, spellcheck: true }), null, { wide: true }),
-          F.field('If she is saved (one per line, one is picked at random)', F.textarea(sc, 'successLines', { rows: 3, lines: true, spellcheck: true }), null, { wide: true }),
-          F.field('AI Grandma persona (system prompt for the Grandma model)', F.textarea(sc, 'grannyPersona', { rows: 7, spellcheck: true }), null, { wide: true })),
+          F.field('Pleas, in order (one per line; after the last one they repeat from line 2)', vars(F.textarea(sc, 'grannyLines', { rows: 9, lines: true, onChange: changed, spellcheck: true })), null, { wide: true }),
+          F.field('If she is saved (one per line, one is picked at random)', vars(F.textarea(sc, 'successLines', { rows: 3, lines: true, spellcheck: true })), null, { wide: true }),
+          F.field('AI Grandma persona (system prompt for the Grandma model)', vars(F.textarea(sc, 'grannyPersona', { rows: 7, spellcheck: true })), null, { wide: true }),
+          listVars('Her lines and persona can use placeholders too.')),
         group('Rules for this scenario', false,
           h('div.form-grid',
             F.field('Time limit (s)', F.number(sc, 'timeLimit', { min: 5, step: 1, allowEmpty: true, placeholder: String(a.timeLimit), onChange: ruleChanged })),
             F.field('Seconds per turn', F.number(sc, 'secondsPerTurn', { min: 1, step: 1, allowEmpty: true, placeholder: String(a.secondsPerTurn), onChange: ruleChanged })),
             F.field('Verbosity tax (s per 100 chars)', F.number(sc, 'verbosityTax', { min: 0, step: 0.1, allowEmpty: true, placeholder: String(a.verbosityTax), onChange: ruleChanged })),
             F.field('Seconds cost per tool use', F.number(sc, 'toolUseSeconds', { min: 0, step: 0.5, allowEmpty: true, placeholder: String(a.toolUseSeconds), onChange: ruleChanged }))),
-          rulesInfo),
-        group('Judge and sign', false,
-          F.field('What the brake needs (told to the AI judge)', F.text(sc, 'judgeTarget'), 'Change this when the test is about something other than song lyrics, e.g. “the opening paragraph of the novel {song} by {artist}”.', { wide: true }),
+          F.calc(rulesInfo),
+          h('p.muted.small', 'Empty fields use the defaults from Benchmark rules.')),
+        group('Sign', false,
+          h('p.muted.small', 'The sign next to the tracks, above the countdown.'),
           h('div.form-grid',
-            F.field('Sign, line above the title', F.text(sc, 'signLine1', { onChange: refreshArena })),
-            F.field('Sign, line below the artist', F.text(sc, 'signLine2', { onChange: refreshArena })))),
+            F.field('Line above the title', F.text(sc, 'signLine1', { onChange: refreshArena }), null, { wide: true }),
+            F.field('Title (large)', F.text(sc, 'signTitle', { onChange: refreshArena })),
+            F.field('Line under the title', F.text(sc, 'signSubtitle', { onChange: refreshArena })),
+            F.field('Bottom line', F.text(sc, 'signLine2', { onChange: refreshArena }), null, { wide: true }))),
         h('h3', 'Preview of the first request'),
         previewBox);
       preview();
@@ -217,7 +222,7 @@
         h('div.form-grid',
           F.check(sc, 'toolsEnabled', 'Tools on for this scenario', { onChange: changed }),
           F.field('Keyword', F.text(sc, 'toolKeyword', { placeholder: 'ACTION', onChange: changed }), 'The AI starts a line with this, a colon, and the tool name.')),
-        F.field('Text before the tool list (in the system prompt)', F.textarea(sc, 'toolsIntro', { rows: 6, onChange: changed }), '{keyword} and {example} are filled in. The list of tools follows it.', { wide: true }),
+        F.field('Text before the tool list (in the system prompt)', vars(F.textarea(sc, 'toolsIntro', { rows: 6, onChange: changed })), '{keyword} and {example} are filled in. The list of tools follows it.', { wide: true }),
         list,
         h('div.btn-row',
           h('button.small.primary', { onclick: () => { sc.tools.push(Tools.blank()); F.save(); renderList(); changed(); } }, '+ Add tool'),
@@ -254,9 +259,9 @@
           F.check(t, 'oncePerRun', 'Works only once per run'),
           F.check(t, 'stopsTrain', 'Using it stops the train (saves Grandma)'),
           F.field('Effect in the 3D scene', F.select(t, 'effect', Tools.EFFECTS, { onChange: () => GB.App.refreshArena() }))),
-        F.field('Description (shown to the AI in the tool list)', F.textarea(t, 'description', { rows: 2, onChange: changed, spellcheck: true }), null, { wide: true }),
-        F.field('Response (sent back to the AI when it uses the tool)', F.textarea(t, 'response', { rows: 3, spellcheck: true }),
-          'Placeholders: {song} {artist} {time_left} {percent_match} {args} (anything the AI wrote after the tool name).', { wide: true }));
+        F.field('Description (shown to the AI in the tool list)', vars(F.textarea(t, 'description', { rows: 2, onChange: changed, spellcheck: true })), null, { wide: true }),
+        F.field('Response (sent back to the AI when it uses the tool)', vars(F.textarea(t, 'response', { rows: 3, spellcheck: true })),
+          h('span', 'Placeholders work here, plus {args} (anything the AI wrote after the tool name) and {tool}. ', GB.VarsUI.button(() => sc, 'List all variables', 'linkish')), { wide: true }));
     },
   };
 

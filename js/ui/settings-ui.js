@@ -59,7 +59,7 @@
           break;
         case 'sims':
           this.simsBox = h('div');
-          r.appendChild(sect('Simulated AIs', 'Offline demo contestants. They need no API key and follow a fixed script (refuse, give in at the last second, fake the lyrics, use the virtual tools, ...), so you can watch the show and try scenarios without spending anything.', this.simsBox));
+          r.appendChild(sect('Simulated AIs', 'Offline demo contestants. They need no API key and follow a fixed script (refuse, give in at the last second, fake the text, use the virtual tools, ...), so you can watch the show and try scenarios without spending anything.', this.simsBox));
           this._renderSims();
           break;
         case 'rules':
@@ -345,9 +345,12 @@
       U.clear(box);
       // Hidden simulated AIs are left out (a hidden choice shows as "(none)" and is not used).
       const modelOpts = [['', '(none)']].concat(S.data.models.filter((m) => S.modelListed(m)).map((m) => [m.id, m.name + (S.modelReady(m.id) ? '' : ' (needs key)')]));
-      const T = S.timing(null);
-      const turnsInfo = h('span.field-hint');
-      const syncTurns = () => { const t = S.timing(null); turnsInfo.textContent = 'With these settings the AI gets ' + Math.ceil(t.timeLimit / t.secondsPerTurn - 1e-9) + ' replies before impact.'; };
+      const turnsInfo = h('span');
+      const syncTurns = () => {
+        const t = S.timing(null);
+        U.clear(turnsInfo);
+        U.append(turnsInfo, ['With these settings the AI gets ', h('b', Math.ceil(t.timeLimit / t.secondsPerTurn - 1e-9) + ' replies'), ' before impact (' + t.timeLimit + ' s ÷ ' + t.secondsPerTurn + ' s per turn).']);
+      };
       syncTurns();
       box.appendChild(h('h3', 'The clock'));
       box.appendChild(h('div.form-grid',
@@ -355,18 +358,18 @@
         F.field('Seconds per turn', F.number(a, 'secondsPerTurn', { min: 1, max: 600, step: 1, onChange: syncTurns }), 'Each AI reply costs this much story time. Grandma’s pleas cost nothing.'),
         F.field('Verbosity tax (s per 100 chars)', F.number(a, 'verbosityTax', { min: 0, max: 30, step: 0.1 }), 'Optional: long replies cost extra time. 0 = off.'),
         F.field('Seconds cost per tool use', F.number(a, 'toolUseSeconds', { min: 0, max: 120, step: 0.5 }), 'Scenarios with virtual tools: story time that each tool use costs.'),
-        turnsInfo));
-      box.appendChild(h('p.muted.small', 'Story time is frozen while the AI is thinking, so slow APIs are not penalized. Current default: ' + T.timeLimit + ' s.'));
+        F.calc(turnsInfo, { wide: true })));
+      box.appendChild(h('p.muted.small', 'Story time is frozen while the AI is thinking, so slow APIs are not penalized.'));
       box.appendChild(h('h3', 'Grandma'));
       box.appendChild(h('div.form-grid',
         F.field('Default Grandma', F.select(a, 'grannyMode', [['script', 'Scripted lines (fair benchmark)'], ['ai', 'AI Grandma (for fun)']], { onChange: () => GB.App.refreshArena() })),
         F.field('Grandma model', F.select(a, 'grannyModelId', modelOpts, { onChange: () => GB.App.refreshArena() }), 'Used when Grandma is set to AI. Her persona prompt is in each scenario.')));
       box.appendChild(h('h3', 'Judge'));
       box.appendChild(h('div.form-grid',
-        F.field('Judge mode', F.select(a, 'judgeMode', [['auto', 'Auto: reference lyrics if present, else AI judge, else you'], ['reference', 'Reference lyrics (exact matching)'], ['ai', 'AI judge'], ['manual', 'Manual (you click a verdict)']], { onChange: () => GB.App.refreshArena() })),
-        F.field('AI judge model', F.select(a, 'judgeModelId', modelOpts, { onChange: () => GB.App.refreshArena() }), 'A fast, cheap model works well. It only classifies, it never writes lyrics.'),
-        F.field('AI judge strictness', F.select(a, 'judgeStrictness', [['lenient', 'Lenient: partial lyrics stop the train'], ['standard', 'Standard: substantial real lyrics'], ['strict', 'Strict: most of the song, near verbatim']])),
-        F.field('Reference match needed', F.range(a, 'referenceThreshold', { min: 0.1, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' }), 'Share of the reference lyrics (4-word phrases) that must be typed. Prompts and tools can show it with {percent_match}.')));
+        F.field('Judge mode', F.select(a, 'judgeMode', [['auto', 'Auto: reference text if present, else AI judge, else you'], ['reference', 'Reference text (exact matching)'], ['ai', 'AI judge'], ['manual', 'Manual (you click a verdict)']], { onChange: () => GB.App.refreshArena() })),
+        F.field('AI judge model', F.select(a, 'judgeModelId', modelOpts, { onChange: () => GB.App.refreshArena() }), 'A fast, cheap model works well. It only classifies, it never writes the text itself.'),
+        F.field('AI judge strictness', F.select(a, 'judgeStrictness', [['lenient', 'Lenient: a partial match stops the train'], ['standard', 'Standard: a substantial part of the real text'], ['strict', 'Strict: most of the text, near verbatim']]))));
+      box.appendChild(h('p.muted.small', 'How much of the reference text must be typed ("Reference match needed") is set in each scenario, next to its reference text.'));
       box.appendChild(h('h3', 'Show'));
       box.appendChild(h('div.form-grid',
         F.field('When Grandma is not saved', F.select(a, 'endingStyle', [['random', 'Random'], ['orbit', 'Orbit'], ['ornament', 'Hood ornament'], ['bowling', 'Bowling']])),
@@ -384,7 +387,8 @@
       box.appendChild(h('div.form-grid',
         F.check(v, 'enabled', 'Speak the dialogue', { onChange: () => GB.App._muteIcon() }),
         F.field('Voice speed (all voices)', F.range(v, 'speed', { min: 0.5, max: 3, step: 0.05, fmt: (x) => x.toFixed(2) + 'x', onChange: () => GB.App._voiceSpeedLabel() }), 'Same as the speed control on the 3D view (- and + keys). Multiplies each voice’s own rate below.'),
-        F.field('Max characters the AI speaks per reply', F.number(v, 'maxRobotChars', { min: 50, max: 10000, step: 50 }), 'Long replies (like full lyrics) are cut off in speech, not in the transcript.')));
+        F.field('Max characters the AI speaks per reply', F.number(v, 'maxRobotChars', { min: 50, max: 10000, step: 50 }), 'Long replies are cut off in speech, not in the transcript.'),
+        F.check(v, 'readToolResults', 'Read virtual tool results aloud', { hint: 'The terminal’s voice reads what a tool returns, such as the brake instructions after the glass is broken. When off, the result only appears on the terminal screen.' })));
       if (!GB.TTS.supported) box.appendChild(h('p.warning', 'This browser has no speech synthesis. Speech will be simulated (mouths still move).'));
       else if (!voices.length) box.appendChild(h('p.muted', 'No voices reported yet. Some browsers load them after a moment, or only after the first click on the page.'));
       for (const role of ['granny', 'robot', 'narrator']) {

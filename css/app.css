@@ -92,6 +92,13 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 .field-hint.inline { font-weight: 400; margin-left: 6px; }
 .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; margin: 4px 0; }
 .check.dim { opacity: 0.6; }
+.check-hint { display: block; margin-top: 2px; }
+.check:has(.check-hint) { align-items: flex-start; }
+.check:has(.check-hint) > input { margin-top: 2px; }
+.calc { display: flex; align-items: baseline; gap: 10px; padding: 8px 12px; margin: 2px 0 10px; border-radius: 8px; background: rgba(45, 212, 191, 0.07); border: 1px solid rgba(45, 212, 191, 0.32); color: #c9f2ec; font-size: 12.5px; }
+.calc.wide { grid-column: 1 / -1; }
+.calc-tag { flex: none; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #5eead4; border: 1px solid rgba(45, 212, 191, 0.5); border-radius: 4px; padding: 0 5px; }
+.calc b { color: #fff; }
 .range { display: flex; align-items: center; gap: 10px; }
 .range-val { min-width: 54px; text-align: right; font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .secret { display: flex; gap: 6px; }
@@ -139,7 +146,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 
 /* ---------- main layout ---------- */
 #main { position: relative; flex: 1; min-height: 0; display: flex; }
-#stage { position: relative; flex: 1; min-width: 0; overflow: hidden; background: #a9c8e6; }
+#stage { position: relative; flex: 1; min-width: 0; overflow: hidden; background: #a9c8e6; container: stage / inline-size; }
 #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; cursor: grab; transition: filter 0.6s; }
 #view:active { cursor: grabbing; }
 #panel {
@@ -209,7 +216,7 @@ body:not([data-tab="arena"]) #panel-toggle { display: none; }
 .t-end.warn { background: rgba(255, 176, 32, 0.12); color: var(--warn); }
 
 /* verdict colors */
-.v-lyrics { background: rgba(61, 220, 132, 0.14); color: #8ff0b8; }
+.v-match { background: rgba(61, 220, 132, 0.14); color: #8ff0b8; }
 .v-partial { background: rgba(255, 204, 26, 0.13); color: #ffe08a; }
 .v-fake { background: rgba(255, 140, 50, 0.14); color: #ffbd8a; }
 .v-refusal { background: rgba(255, 90, 79, 0.14); color: #ffaaa3; }
@@ -245,7 +252,7 @@ body:not([data-tab="arena"]) #panel-toggle { display: none; }
 .hud-model { position: absolute; left: 12px; bottom: 52px; z-index: 3; pointer-events: none; background: rgba(12, 14, 20, 0.72); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 7px 11px; display: flex; flex-direction: column; max-width: 260px; }
 .hud-model .hm-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .hud-model .hm-name { font-weight: 800; font-size: 14px; }
-.hud-model .hm-song { font-size: 12px; color: #d8c8a8; }
+.hud-model .hm-scenario { font-size: 12px; color: #d8c8a8; }
 .altitude { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-weight: 800; font-size: 22px; color: #fff4b0; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6); white-space: nowrap; }
 .fps { position: absolute; right: 12px; top: 10px; z-index: 3; font-family: var(--mono); font-size: 11px; color: #fff; background: rgba(0, 0, 0, 0.5); padding: 2px 6px; border-radius: 4px; }
 
@@ -299,12 +306,14 @@ body:not([data-tab="arena"]) #panel-toggle { display: none; }
 #play-controls .speed-ctl { display: inline-flex; align-items: center; background: rgba(14, 16, 22, 0.8); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; backdrop-filter: blur(6px); }
 #play-controls .speed-ctl button { background: transparent; border: none; padding: 5px 9px; font-size: 14px; font-weight: 700; }
 #play-controls #speed-val { font-size: 12px; min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
-#cam-controls { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; z-index: 3; max-width: calc(100% - 24px); }
+#cam-controls { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; z-index: 3; max-width: calc(100% - 340px); }
 #cam-controls button, #cam-controls select { background: rgba(14, 16, 22, 0.8); border-color: rgba(255, 255, 255, 0.12); font-size: 12px; padding: 5px 10px; backdrop-filter: blur(6px); }
 #cam-controls select { width: auto; color: var(--text); border-radius: 8px; }
 #cam-controls button.active { border-color: var(--accent); color: var(--accent); }
 #cam-controls .hint { font-size: 11px; color: rgba(255, 255, 255, 0.85); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
 body.running #cam-controls .hint { display: none; }
+/* The camera hint needs a wide 3D view next to the voice controls. */
+@container stage (max-width: 980px) { #cam-controls .hint { display: none; } }
 
 /* ---------- result card ---------- */
 #result-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 8; background: rgba(14, 16, 22, 0.93); border: 1px solid #333c50; border-radius: 16px; padding: 22px 26px; width: min(460px, calc(100% - 32px)); text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); }
@@ -381,6 +390,9 @@ body.running #cam-controls .hint { display: none; }
 .tool-name { flex: 1; min-width: 180px; }
 .tool-name .input { font-family: var(--mono); font-weight: 700; letter-spacing: 0.02em; }
 button.linkish { background: none; border: none; padding: 0; color: var(--accent); text-decoration: underline; font: inherit; cursor: pointer; }
+.vars-table td { vertical-align: top; }
+.var-chip { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+.var-example { font-family: var(--mono); font-size: 11.5px; color: var(--muted); max-width: 300px; overflow-wrap: anywhere; }
 button.linkish:hover:not(:disabled) { background: none; color: #ffe07a; }
 #btn-edit-scenario { margin-top: 2px; }
 
@@ -444,6 +456,7 @@ button.linkish:hover:not(:disabled) { background: none; color: #ffe07a; }
   .clock { font-size: 24px; }
   .clock-box { min-width: 110px; }
   .hud-model { display: none; }
+  #cam-controls { max-width: calc(100% - 24px); }
   #cam-controls .hint { display: none; }
   #play-controls { bottom: 52px; }
   #play-controls .pc-label { display: none; }

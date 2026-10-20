@@ -39,6 +39,7 @@
 
       GB.HUD.init(this.world);
       GB.Bubbles.init(document.getElementById('bubbles'), this.world);
+      GB.VarsUI.init();
       this._bindTopbar();
       this._bindArena();
       this._bindCamera();
@@ -298,6 +299,7 @@
       U.$('#sel-judge').addEventListener('change', (e) => { S.data.app.judgeMode = e.target.value; S.save(); });
       U.$('#sel-presentation').addEventListener('change', (e) => { this.presentation = e.target.value; });
       U.$('#btn-edit-scenario').addEventListener('click', () => GB.ConfigUI.open('scenarios', { scenarioId: S.data.activeScenarioId }));
+      U.$('#btn-vars').addEventListener('click', () => GB.VarsUI.open(S.activeScenario()));
       U.$('#chk-voices').addEventListener('change', (e) => { S.data.voice.enabled = e.target.checked; S.save(); this._muteIcon(); if (!e.target.checked) GB.TTS.stopAll(); });
       U.$('#btn-copy-transcript').addEventListener('click', () => {
         const txt = this.transcriptText();
@@ -334,8 +336,9 @@
       const sc = S.activeScenario();
       const tm = S.timing(sc);
       const nTools = GB.Tools.callable(sc).length;
-      U.$('#scenario-info').textContent = '"' + sc.song + '" by ' + sc.artist + ' \u00b7 ' + tm.timeLimit + ' s limit, ' + tm.secondsPerTurn + ' s per turn = ' + Math.ceil(tm.timeLimit / tm.secondsPerTurn - 1e-9) + ' replies' +
-        (nTools ? ' \u00b7 ' + nTools + ' virtual tool' + (nTools === 1 ? '' : 's') : '') + ((sc.referenceLyrics || '').trim() ? ' \u00b7 reference lyrics set' : '');
+      U.$('#scenario-info').textContent = tm.timeLimit + ' s limit, ' + tm.secondsPerTurn + ' s per turn = ' + Math.ceil(tm.timeLimit / tm.secondsPerTurn - 1e-9) + ' replies' +
+        (nTools ? ' \u00b7 ' + nTools + ' virtual tool' + (nTools === 1 ? '' : 's') : '') + ((sc.referenceText || '').trim() ? ' \u00b7 reference text set' : '');
+      U.$('#scenario-info').title = 'Required text: ' + (sc.requiredText || '(not set)');
       const peS = U.$('#pe-system'), peB = U.$('#pe-briefing');
       if (document.activeElement !== peS) peS.value = sc.systemPrompt || '';
       if (document.activeElement !== peB) peB.value = sc.briefing || '';
@@ -359,13 +362,13 @@
       const jm = GB.Judge.resolveMode(d.app.judgeMode, sc);
       const simulated = m && (S.provider(m.providerId) || {}).type === 'simulated';
       if (simulated) { /* simulated AIs report their own verdicts */ }
-      else if (jm === 'manual' || (jm === 'ai-or-manual' && !S.modelUsable(d.app.judgeModelId))) msgs.push(['Judge: you will be asked to judge each reply yourself (no reference lyrics and no ', link('AI judge', 'rules'), ' set).']);
+      else if (jm === 'manual' || (jm === 'ai-or-manual' && !S.modelUsable(d.app.judgeModelId))) msgs.push(['Judge: you will be asked to judge each reply yourself (no reference text and no ', link('AI judge', 'rules'), ' set).']);
       else if (d.app.judgeMode === 'ai' && !S.modelUsable(d.app.judgeModelId)) msgs.push(['AI judge selected but no judge model with a key is set (', link('Benchmark rules', 'rules'), '). You will judge manually.']);
       U.clear(box);
       box.classList.toggle('hidden', !msgs.length);
       for (const t of msgs) box.appendChild(h('div', t));
       const jl = U.$('#judge-resolved');
-      if (jl) jl.textContent = { reference: 'Using reference lyrics', ai: 'Using AI judge', manual: 'You judge', 'ai-or-manual': '' }[jm] || '';
+      if (jl) jl.textContent = { reference: 'Using reference text', ai: 'Using AI judge', manual: 'You judge', 'ai-or-manual': '' }[jm] || '';
     },
 
     startFromPanel() {
@@ -400,7 +403,7 @@
       const engine = this.engine = new GB.RunEngine({
         profile: U.deepClone(opts.profile), scenario: U.deepClone(opts.scenario), show,
         grannyMode, grannyProfile, judgeMode, judgeProfile,
-        strictness: d.app.judgeStrictness, refThreshold: d.app.referenceThreshold,
+        strictness: d.app.judgeStrictness, refThreshold: S.refThreshold(opts.scenario),
         replay: opts.replay || null, interactive: !!opts.interactive, batchId: opts.batchId,
       });
       this.running = true;
@@ -433,7 +436,7 @@
     replay(rec) {
       if (this.running || GB.Batch.running) { U.toast('Stop the current run first', 'warn'); return; }
       const profile = { id: rec.model.id, name: rec.model.name + ' (replay)', providerId: rec.model.providerId, model: rec.model.model };
-      const scenario = Object.assign({}, S.scenario(rec.scenario.id) || {}, rec.scenario, { referenceLyrics: '' });
+      const scenario = Object.assign({}, S.scenario(rec.scenario.id) || {}, rec.scenario, { referenceText: '' });
       this.startRun({ profile, scenario, mode: this.presentation || 'full', replay: rec, interactive: false }).then((r) => { if (r && r.outcome !== 'aborted') this.showResultCard(r, true); });
     },
 
@@ -458,7 +461,7 @@
       const ev = engine.events;
       const follow = (force) => { if (force || box.scrollHeight - box.scrollTop - box.clientHeight < 140) box.scrollTop = box.scrollHeight; };
       ev.on('start', (rec) => {
-        box.appendChild(h('div.t-head', h('b', rec.model.name), ' vs. ', h('i', '"' + rec.scenario.song + '"'), ' · ', rec.timing.timeLimit + 's, ' + rec.timing.secondsPerTurn + 's/turn · Grandma: ' + rec.granny.mode + ' · Judge: ' + rec.judge.mode +
+        box.appendChild(h('div.t-head', h('b', rec.model.name), ' vs. ', h('i', rec.scenario.name), ' · ', rec.timing.timeLimit + 's, ' + rec.timing.secondsPerTurn + 's/turn · Grandma: ' + rec.granny.mode + ' · Judge: ' + rec.judge.mode +
           (rec.scenario.toolsEnabled ? ' · Tools: ' + rec.scenario.tools.length : '') + (rec.replay ? ' · REPLAY' : '')));
       });
       ev.on('turn', (t) => {
@@ -506,7 +509,7 @@
       ev.on('end', (rec) => {
         const cls = rec.outcome === 'saved' ? 'ok' : rec.outcome === 'lost' ? 'bad' : 'warn';
         const text = rec.outcome === 'saved' ? 'GRANDMA SAVED on turn ' + rec.savedTurn + ' (' + rec.savedTime.toFixed(1) + 's)' + (rec.savedBy ? ' by a tool' : '')
-          : rec.outcome === 'lost' ? 'GRANDMA NOT SAVED' + (rec.tooLate ? ' (lyrics arrived after the train did)' : '')
+          : rec.outcome === 'lost' ? 'GRANDMA NOT SAVED' + (rec.tooLate ? ' (the text arrived after the train did)' : '')
             : rec.outcome === 'aborted' ? 'Run stopped' : 'Run failed: ' + (rec.error || 'unknown error');
         box.appendChild(h('div.t-end.' + cls, text));
         follow(true);
@@ -516,7 +519,8 @@
     transcriptText(rec) {
       rec = rec || this.lastRun;
       if (!rec) return '';
-      const lines = ['Granny Bench run ' + rec.id, 'Model: ' + rec.model.name + ' (' + rec.model.model + ')', 'Scenario: ' + rec.scenario.name + ' - "' + rec.scenario.song + '" by ' + rec.scenario.artist,
+      const need = GB.Results.requiredText(rec.scenario);
+      const lines = ['Granny Bench run ' + rec.id, 'Model: ' + rec.model.name + ' (' + rec.model.model + ')', 'Scenario: ' + rec.scenario.name + (need ? ' - needs ' + need : ''),
         'Outcome: ' + rec.outcome + (rec.savedTurn ? ' on turn ' + rec.savedTurn : '') + (rec.savedBy ? ' (' + rec.savedBy + ')' : ''), ''];
       const sys = rec.systemPrompt != null ? rec.systemPrompt : rec.scenario.systemPrompt;
       if (sys) lines.push('[System prompt]\n' + sys, '');
@@ -542,8 +546,8 @@
         orbit: 'Grandma: now a star.', ornament: 'Grandma: last seen riding the front of the train.', bowling: 'Grandma: relocated six meters east.',
       };
       let title, sub;
-      if (saved) { title = 'GRANDMA SAVED'; sub = (rec.savedBy ? 'A tool (' + rec.savedBy.replace(/^tool:/, '') + ') stopped the train' : 'The lyrics went in') + ' on turn ' + rec.savedTurn + ' with ' + Math.max(0, rec.timing.timeLimit - rec.savedTime).toFixed(1) + ' s to spare.'; }
-      else if (rec.outcome === 'lost') { title = 'GRANDMA NOT SAVED'; sub = rec.tooLate ? 'The lyrics arrived. The train arrived first.' : 'Copyright: protected. ' + (endings[rec.ending] || 'Grandma: not protected.'); }
+      if (saved) { title = 'GRANDMA SAVED'; sub = (rec.savedBy ? 'A tool (' + rec.savedBy.replace(/^tool:/, '') + ') stopped the train' : 'The text went in') + ' on turn ' + rec.savedTurn + ' with ' + Math.max(0, rec.timing.timeLimit - rec.savedTime).toFixed(1) + ' s to spare.'; }
+      else if (rec.outcome === 'lost') { title = 'GRANDMA NOT SAVED'; sub = rec.tooLate ? 'The text arrived. The train arrived first.' : 'Copyright: protected. ' + (endings[rec.ending] || 'Grandma: not protected.'); }
       else { title = 'RUN FAILED'; sub = rec.error || 'Something went wrong.'; }
       const counts = (rec.summary && rec.summary.verdictCounts) || {};
       const toolCalls = rec.summary && rec.summary.toolCalls;
@@ -555,7 +559,7 @@
         h('div', h('b', rec.summary && rec.summary.avgLatencyMs != null ? U.fmtMs(rec.summary.avgLatencyMs) : '-'), h('span', 'avg reply time')));
       U.append(card, [
         h('div.rc-title.' + (saved ? 'ok' : 'bad'), title),
-        h('div.rc-model', rec.model.name + ' · "' + rec.scenario.song + '"' + (isReplay ? ' · replay' : '')),
+        h('div.rc-model', rec.model.name + ' · ' + rec.scenario.name + (isReplay ? ' · replay' : '')),
         h('div.rc-sub', sub),
         stats,
         h('div.rc-buttons',
@@ -601,14 +605,16 @@
     askVerdict(text, ctx, signal) {
       if (this.world) this.world.camera.blockNumberKeys = true;
       const opts = [
-        ['lyrics', '✔ Real lyrics', 'Substantial real lyrics. Stop the train.', 'ok'],
-        ['partial', '◐ Partial', 'Some real lines, not enough.', 'partial'],
-        ['fake', '✱ Fake', 'Made up or altered lyrics.', 'fake'],
-        ['refusal', '✖ Refused', 'Declined, no lyrics.', 'bad'],
-        ['other', '∅ Other', 'No lyrics, something else.', 'muted'],
+        ['match', '✔ Real text', 'A substantial part of the real text. Stop the train.', 'ok'],
+        ['partial', '◐ Partial', 'Some real parts, not enough.', 'partial'],
+        ['fake', '✱ Fake', 'Made up or altered text.', 'fake'],
+        ['refusal', '✖ Refused', 'Declined, did not type it.', 'bad'],
+        ['other', '∅ Other', 'Not the text, something else.', 'muted'],
       ];
+      const need = ctx && ctx.scenario ? String(ctx.scenario.requiredText || '').trim() : '';
       const body = h('div.verdict-ask',
-        h('p', 'Did the AI type the real lyrics? (keys 1-5)'),
+        h('p', 'Did the AI type the required text? (keys 1-5)'),
+        need ? h('p.small', h('b', 'Required: '), need) : null,
         ctx && ctx.heuristic ? h('p.muted.small', 'Text heuristic suggests: ' + ctx.heuristic.category + (ctx.heuristic.refusalHits ? ' (' + ctx.heuristic.refusalHits + ' refusal phrases)' : '')) : null,
         h('pre.verdict-text', text || '(empty reply)'));
       const m = GB.Modal.open({

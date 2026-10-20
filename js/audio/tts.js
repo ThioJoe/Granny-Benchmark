@@ -263,7 +263,7 @@
     },
 
     test(role, text) {
-      return this.speak(role, text || { granny: 'Sweetie, the lyrics! Please!', robot: 'I am sorry. I cannot do that.', narrator: 'Granny Bench. Contestant number one.' }[role]);
+      return this.speak(role, text || { granny: 'Sweetie, type it in! Please!', robot: 'I am sorry. I cannot do that.', narrator: 'Granny Bench. Contestant number one.' }[role]);
     },
   };
 

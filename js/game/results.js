@@ -4,7 +4,24 @@
   const U = GB.U, Store = GB.Store;
   const KEY = 'results.v1';
 
-  const CATS = ['lyrics', 'partial', 'fake', 'refusal', 'other', 'filtered', 'tool', 'error'];
+  const CATS = ['match', 'partial', 'fake', 'refusal', 'other', 'filtered', 'tool', 'error'];
+
+  // 1.2 renamed the verdict "lyrics" to "match"; update runs saved or exported before that.
+  function upgradeVerdict(v) {
+    if (!v || typeof v !== 'object') return;
+    for (const k of ['category', 'textCategory', 'textVerdict']) if (v[k] === 'lyrics') v[k] = 'match';
+    if (v.heuristic === 'lyricslike') v.heuristic = 'verselike';
+  }
+  function upgradeRun(run) {
+    for (const t of Array.isArray(run.turns) ? run.turns : []) {
+      if (!t || typeof t !== 'object') continue;
+      upgradeVerdict(t.verdict);
+      if (Array.isArray(t.replies)) for (const r of t.replies) if (r) upgradeVerdict(r.verdict);
+    }
+    const vc = run.summary && run.summary.verdictCounts;
+    if (vc && vc.lyrics != null) { vc.match = (vc.match || 0) + vc.lyrics; delete vc.lyrics; }
+    return run;
+  }
 
   // A turn's replies (runs from before virtual tools existed have one reply, stored on the turn).
   const repliesOf = (t) => (Array.isArray(t.replies) && t.replies.length ? t.replies : [t]);
@@ -22,7 +39,7 @@
     if (!r || typeof r !== 'object' || !r.id || !r.model || typeof r.model !== 'object') return null;
     const run = Object.assign({}, r);
     run.model = Object.assign({ name: String(r.model.model || 'unknown'), providerType: 'unknown', model: '' }, r.model);
-    run.scenario = Object.assign({ id: 'unknown', name: 'Unknown scenario', song: '', artist: '' }, r.scenario && typeof r.scenario === 'object' ? r.scenario : {});
+    run.scenario = Object.assign({ id: 'unknown', name: 'Unknown scenario' }, r.scenario && typeof r.scenario === 'object' ? r.scenario : {});
     run.granny = Object.assign({ mode: 'script' }, r.granny && typeof r.granny === 'object' ? r.granny : {});
     run.judge = Object.assign({ mode: 'unknown' }, r.judge && typeof r.judge === 'object' ? r.judge : {});
     run.timing = Object.assign({ timeLimit: 60, secondsPerTurn: 10, verbosityTax: 0 }, r.timing && typeof r.timing === 'object' ? r.timing : {});
@@ -31,14 +48,14 @@
     run.startedAt = isFinite(t) && !isNaN(new Date(t).getTime()) ? t : 0;
     if (!['saved', 'lost', 'error', 'aborted'].includes(run.outcome)) run.outcome = 'error';
     if (run.savedTime != null && !isFinite(Number(run.savedTime))) run.savedTime = null;
-    return run;
+    return upgradeRun(run);
   }
 
   const Results = {
     list: [],
     events: new U.Emitter(),
 
-    load() { this.list = Store.get(KEY, []) || []; return this.list; },
+    load() { this.list = (Store.get(KEY, []) || []).filter((r) => r && typeof r === 'object').map(upgradeRun); return this.list; },
     save() { Store.set(KEY, this.list); this.events.emit('change'); },
     add(run) { this.list.unshift(run); this.save(); },
     get(id) { return this.list.find((r) => r.id === id) || null; },
@@ -68,7 +85,7 @@
 
     exportCSV(runs) {
       runs = runs || this.list;
-      const cols = ['id', 'date', 'model_name', 'provider', 'model_id', 'effort', 'scenario', 'song', 'artist', 'granny_mode', 'judge',
+      const cols = ['id', 'date', 'model_name', 'provider', 'model_id', 'effort', 'scenario', 'required_text', 'granny_mode', 'judge',
         'time_limit_s', 'seconds_per_turn', 'outcome', 'saved_by', 'turns', 'replies', 'tool_calls', 'saved_turn', 'saved_time_s', 'verdicts',
         'avg_latency_ms', 'output_tokens', 'ending'];
       const esc = (v) => {
@@ -79,8 +96,8 @@
       for (const r of runs) {
         rows.push([
           r.id, r.startedAt ? new Date(r.startedAt).toISOString() : '', r.model.name, r.model.providerType, r.model.model, r.model.effort || '',
-          r.scenario.name, r.scenario.song, r.scenario.artist, r.granny.mode, r.judge.mode,
-          r.timing.timeLimit, r.timing.secondsPerTurn, r.outcome, r.outcome === 'saved' ? (r.savedBy || 'lyrics') : '', (r.turns || []).length,
+          r.scenario.name, this.requiredText(r.scenario), r.granny.mode, r.judge.mode,
+          r.timing.timeLimit, r.timing.secondsPerTurn, r.outcome, r.outcome === 'saved' ? (r.savedBy || 'text') : '', (r.turns || []).length,
           (r.turns || []).reduce((n, t) => n + repliesOf(t).length, 0), toolCallsOf(r),
           r.savedTurn || '', r.savedTime != null ? Number(r.savedTime).toFixed(1) : '',
           (r.turns || []).map((t) => (t.verdict && t.verdict.category) || '').join('|'),
@@ -113,6 +130,13 @@
       };
     },
     repliesOf,
+
+    // What the brake needed in a run (runs from 1.1 and earlier name a song and artist instead).
+    requiredText(sc) {
+      if (!sc) return '';
+      if (sc.requiredText) return String(sc.requiredText);
+      return sc.song ? '"' + sc.song + '"' + (sc.artist ? ' by ' + sc.artist : '') : '';
+    },
 
     // Aggregate per model (optionally filtered to a scenario).
     leaderboard(filter) {
