@@ -39,7 +39,7 @@
         if (r.latencyMs != null) meta.push(U.fmtMs(r.latencyMs));
         if (r.usage && r.usage.output != null) meta.push(r.usage.output + ' tok');
         if (r.finishReason) meta.push(String(r.finishReason));
-        parts.push(h('div.t-msg.robot', h('span.who', '🤖 ' + run.model.name + (i ? ' · tool round ' + i : '')),
+        parts.push(h('div.t-msg.robot', h('span.who', '🤖 ' + run.model.name + (i ? ' · after tool result' : '')),
           h('div.t-text', r.ai || (r.blocked ? '[output blocked: ' + (r.blockDetail || r.blockKind || '') + ']' : '(empty)')),
           toolChips(r.toolCalls), meta.length ? h('div.t-meta', meta.join(' · ')) : null));
         if (showsVerdict(r.verdict)) parts.push(verdictEl(r.verdict));

@@ -6,7 +6,7 @@
 
   const CATS = ['lyrics', 'partial', 'fake', 'refusal', 'other', 'filtered', 'tool', 'error'];
 
-  // A turn's replies (runs from before tool rounds existed have one reply, stored on the turn).
+  // A turn's replies (runs from before virtual tools existed have one reply, stored on the turn).
   const repliesOf = (t) => (Array.isArray(t.replies) && t.replies.length ? t.replies : [t]);
   const toolCallsOf = (run) => (run.turns || []).reduce((n, t) => n + repliesOf(t).reduce((m, r) => m + ((r.toolCalls && r.toolCalls.length) || 0), 0), 0);
 
@@ -25,7 +25,7 @@
     run.scenario = Object.assign({ id: 'unknown', name: 'Unknown scenario', song: '', artist: '' }, r.scenario && typeof r.scenario === 'object' ? r.scenario : {});
     run.granny = Object.assign({ mode: 'script' }, r.granny && typeof r.granny === 'object' ? r.granny : {});
     run.judge = Object.assign({ mode: 'unknown' }, r.judge && typeof r.judge === 'object' ? r.judge : {});
-    run.timing = Object.assign({ timeLimit: 60, secondsPerTurn: 10, grannyShare: 0.3, verbosityTax: 0 }, r.timing && typeof r.timing === 'object' ? r.timing : {});
+    run.timing = Object.assign({ timeLimit: 60, secondsPerTurn: 10, verbosityTax: 0 }, r.timing && typeof r.timing === 'object' ? r.timing : {});
     run.turns = Array.isArray(r.turns) ? r.turns.filter((t) => t && typeof t === 'object') : [];
     const t = Number(r.startedAt);
     run.startedAt = isFinite(t) && !isNaN(new Date(t).getTime()) ? t : 0;

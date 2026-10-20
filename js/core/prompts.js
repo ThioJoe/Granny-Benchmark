@@ -177,10 +177,8 @@
       // Rule overrides; null = use the default from Settings > Benchmark rules.
       timeLimit: null,
       secondsPerTurn: null,
-      grannyShare: null,
       verbosityTax: null,
-      toolRoundSeconds: null,
-      maxToolRounds: null,
+      toolUseSeconds: null,
       builtin: true,
     }, extra || {});
   }

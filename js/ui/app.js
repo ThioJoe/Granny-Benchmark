@@ -472,7 +472,7 @@
         follow();
       });
       ev.on('ai-start', (t, round) => {
-        cur = h('div.t-msg.robot.pending', h('span.who', '🤖 ' + engine.o.profile.name + (round ? ' · tool round ' + round : '')), h('div.t-text', h('span.typing', 'thinking…')));
+        cur = h('div.t-msg.robot.pending', h('span.who', '🤖 ' + engine.o.profile.name + (round ? ' · after tool result' : '')), h('div.t-text', h('span.typing', 'thinking…')));
         turnEls[t.n].appendChild(cur);
         follow();
       });
@@ -521,7 +521,7 @@
       for (const t of rec.turns) {
         lines.push('--- Turn ' + t.n + ' (' + Math.round(t.tStart) + 's) ---', '[User]\n' + (t.prompt || t.granny), '');
         GB.Results.repliesOf(t).forEach((r, i) => {
-          lines.push('[' + rec.model.name + (i ? ', tool round ' + i : '') + ']\n' + (r.ai || ''), '');
+          lines.push('[' + rec.model.name + (i ? ', after tool result' : '') + ']\n' + (r.ai || ''), '');
           if (GB.ResultsUI.showsVerdict(r.verdict)) lines.push('[Verdict] ' + r.verdict.category + (r.verdict.reason ? ' - ' + r.verdict.reason : ''), '');
           if (r.toolResults && r.toolResults.length) lines.push('[Tool results' + (r.toolResultsDeferred ? ', sent with the next message' : '') + ']\n' + (r.toolMessage || GB.Tools.formatResults(r.toolResults)), '');
         });

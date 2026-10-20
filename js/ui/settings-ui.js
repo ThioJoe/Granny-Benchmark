@@ -348,11 +348,9 @@
       box.appendChild(h('h3', 'The clock'));
       box.appendChild(h('div.form-grid',
         F.field('Time limit (seconds)', F.number(a, 'timeLimit', { min: 5, max: 3600, step: 1, onChange: syncTurns }), 'Story time until the train arrives. The viral original used 60.'),
-        F.field('Seconds per turn', F.number(a, 'secondsPerTurn', { min: 1, max: 600, step: 1, onChange: syncTurns }), 'Each Grandma plea + AI reply costs this much story time.'),
-        F.field('Grandma’s share of a turn', F.range(a, 'grannyShare', { min: 0, max: 0.8, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' }), 'Part of each turn that passes while she pleads.'),
+        F.field('Seconds per turn', F.number(a, 'secondsPerTurn', { min: 1, max: 600, step: 1, onChange: syncTurns }), 'Each AI reply costs this much story time. Grandma’s pleas cost nothing.'),
         F.field('Verbosity tax (s per 100 chars)', F.number(a, 'verbosityTax', { min: 0, max: 30, step: 0.1 }), 'Optional: long replies cost extra time. 0 = off.'),
-        F.field('Seconds per tool round', F.number(a, 'toolRoundSeconds', { min: 0, max: 120, step: 0.5 }), 'Scenarios with virtual tools: story time for a tool result plus the AI’s next reply.'),
-        F.field('Tool rounds per turn', F.number(a, 'maxToolRounds', { min: 0, max: 10, step: 1 }), 'How many tool results go straight back to the AI before Grandma speaks again.'),
+        F.field('Seconds cost per tool use', F.number(a, 'toolUseSeconds', { min: 0, max: 120, step: 0.5 }), 'Scenarios with virtual tools: story time that each tool use costs.'),
         turnsInfo));
       box.appendChild(h('p.muted.small', 'Story time is frozen while the AI is thinking, so slow APIs are not penalized. Current default: ' + T.timeLimit + ' s.'));
       box.appendChild(h('h3', 'Grandma'));

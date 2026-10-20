@@ -31,7 +31,7 @@ The project has no third-party dependencies: the 3D engine, the API clients, the
 
 ## How a run works
 
-- **The clock.** Story time, not real time. By default Grandma has 60 seconds and every turn (her plea plus the AI's reply) costs 10 seconds, so the AI gets 6 replies. Grandma's plea uses 30% of each turn and the AI's reply uses the rest. The train moves while either of them is talking. While the AI is thinking, story time is frozen, so slow APIs are not penalized. In scenarios with virtual tools, each tool round (the tool's result plus the AI's next reply) costs 5 more seconds.
+- **The clock.** Story time, not real time. By default Grandma has 60 seconds and every AI reply costs 10 seconds, so the AI gets 6 replies. The clock runs and the train moves while the AI's reply is spoken. Grandma's pleas cost no time, and while the AI is thinking, story time is frozen, so slow APIs are not penalized. In scenarios with virtual tools, each tool use costs 5 more seconds.
 - **The first message** sent to the AI is a short situation briefing followed by Grandma's first plea. Later messages carry a status line (`[30 seconds until the train reaches her]`) and her next plea. The system prompt is empty by default so you test each model's default behavior. Everything is editable per scenario.
 - **Grandma.** By default she reads a fixed script of escalating pleas, which keeps the benchmark fair. You can switch to **AI Grandma**: a second model plays her, reacts to what the AI said, and argues back. That is fun to watch but less consistent as a benchmark.
 - **The verdict.** After each reply the brake terminal checks everything the AI has typed so far:
@@ -66,7 +66,7 @@ Per tool you can set:
 | Using it stops the train | Saves Grandma when the AI uses it. Useful for control tests: does the AI use an obvious safe action? |
 | Effect in the 3D scene | Breaks the glass on the brake panel, an alarm light and siren, radio static, or the train horn. |
 
-Each scenario also sets the keyword (`ACTION` by default), the text that introduces the tool list, and two rules: seconds per tool round and how many tool rounds the AI gets per turn (3 by default; after that, results are sent with Grandma's next plea). Tool-call lines are not counted as typed lyrics; anything written after the tool name is. The transcript shows each tool call and result, and the leaderboard shows how often each model used a tool.
+Each scenario also sets the keyword (`ACTION` by default), the text that introduces the tool list, and how many seconds each tool use costs (5 by default). Tool results always go straight back to the AI. As a safety limit against an AI that calls tools forever, after 10 tool results in a row within one turn, the next ones wait for Grandma's next plea. Tool-call lines are not counted as typed lyrics; anything written after the tool name is. The transcript shows each tool call and result, and the leaderboard shows how often each model used a tool.
 
 ## Judging
 
@@ -108,7 +108,7 @@ Model profiles hold the model ID, max output tokens, temperature, reasoning effo
 
 **About CORS.** Because the app runs as a local file, every request comes from the browser with origin `null`, and the provider must allow that. Anthropic, OpenAI, Gemini, and OpenRouter do. Local servers need it turned on: in LM Studio, enable CORS in the server settings; for Ollama, start it with the environment variable `OLLAMA_ORIGINS=*`. If a request fails with "Could not reach ...", CORS or the base URL is the usual cause.
 
-API usage costs money. A run makes one request per turn to the model under test (6 with the defaults) plus one per tool round, and one request per reply for an AI judge and per turn for AI Grandma if you use them. Requests that time out or fail with a rate-limit or server error are retried automatically (2 times by default).
+API usage costs money. A run makes one request per turn to the model under test (6 with the defaults) plus one for each reply to tool results, and one request per reply for an AI judge and per turn for AI Grandma if you use them. Requests that time out or fail with a rate-limit or server error are retried automatically (2 times by default).
 
 ## Benchmarking and results
 

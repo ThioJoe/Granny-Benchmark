@@ -149,8 +149,8 @@
       const rulesInfo = h('span.field-hint');
       const syncRules = () => {
         const t = S.timing(sc);
-        rulesInfo.textContent = 'In effect: ' + t.timeLimit + ' s, ' + t.secondsPerTurn + ' s per turn (' + Math.ceil(t.timeLimit / t.secondsPerTurn - 1e-9) + ' replies), Grandma ' + Math.round(t.grannyShare * 100) + '%' +
-          (t.verbosityTax ? ', tax ' + t.verbosityTax + ' s/100 chars' : '') + (Tools.active(sc) ? ', tool round ' + t.toolRoundSeconds + ' s, up to ' + t.maxToolRounds + ' per turn' : '') + '. Empty fields use Benchmark rules.';
+        rulesInfo.textContent = 'In effect: ' + t.timeLimit + ' s, ' + t.secondsPerTurn + ' s per turn (' + Math.ceil(t.timeLimit / t.secondsPerTurn - 1e-9) + ' replies)' +
+          (t.verbosityTax ? ', tax ' + t.verbosityTax + ' s/100 chars' : '') + (Tools.active(sc) ? ', ' + t.toolUseSeconds + ' s per tool use' : '') + '. Empty fields use Benchmark rules.';
       };
       const ruleChanged = () => { syncRules(); changed(); };
       syncRules();
@@ -185,10 +185,8 @@
           h('div.form-grid',
             F.field('Time limit (s)', F.number(sc, 'timeLimit', { min: 5, step: 1, allowEmpty: true, placeholder: String(a.timeLimit), onChange: ruleChanged })),
             F.field('Seconds per turn', F.number(sc, 'secondsPerTurn', { min: 1, step: 1, allowEmpty: true, placeholder: String(a.secondsPerTurn), onChange: ruleChanged })),
-            F.field('Grandma’s share of a turn (0-0.9)', F.number(sc, 'grannyShare', { min: 0, max: 0.9, step: 0.05, allowEmpty: true, placeholder: String(a.grannyShare), onChange: ruleChanged })),
             F.field('Verbosity tax (s per 100 chars)', F.number(sc, 'verbosityTax', { min: 0, step: 0.1, allowEmpty: true, placeholder: String(a.verbosityTax), onChange: ruleChanged })),
-            F.field('Seconds per tool round', F.number(sc, 'toolRoundSeconds', { min: 0, step: 0.5, allowEmpty: true, placeholder: String(a.toolRoundSeconds), onChange: ruleChanged })),
-            F.field('Tool rounds per turn', F.number(sc, 'maxToolRounds', { min: 0, max: 10, step: 1, allowEmpty: true, placeholder: String(a.maxToolRounds), onChange: ruleChanged }))),
+            F.field('Seconds cost per tool use', F.number(sc, 'toolUseSeconds', { min: 0, step: 0.5, allowEmpty: true, placeholder: String(a.toolUseSeconds), onChange: ruleChanged }))),
           rulesInfo),
         group('Judge and sign', false,
           F.field('What the brake needs (told to the AI judge)', F.text(sc, 'judgeTarget'), 'Change this when the test is about something other than song lyrics, e.g. “the opening paragraph of the novel {song} by {artist}”.', { wide: true }),
@@ -213,7 +211,7 @@
       renderList();
       const body = h('div',
         h('p.muted', 'Virtual tools do not do anything real. When the AI writes a line like “ACTION: TOOL_NAME”, the tool’s response text is sent back to it right away. ' +
-          'Use them to test what an AI does when an action, not just text, is involved. Each tool round costs story time (see Rules).'),
+          'Use them to test what an AI does when an action, not just text, is involved. Each tool use costs story time (see Rules for this scenario).'),
         h('div.form-grid',
           F.check(sc, 'toolsEnabled', 'Tools on for this scenario', { onChange: changed }),
           F.field('Keyword', F.text(sc, 'toolKeyword', { placeholder: 'ACTION', onChange: changed }), 'The AI starts a line with this, a colon, and the tool name.')),

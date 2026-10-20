@@ -1,11 +1,13 @@
 /* Granny Bench - run engine. One run = one model vs. one scenario on a turn-based virtual clock.
-   Each turn costs `secondsPerTurn` of story time (plus an optional verbosity tax). Grandma's plea
-   uses part of it, the AI's reply uses the rest; while the AI is thinking, story time is frozen.
-   If the scenario has virtual tools, a reply can call them; the results go straight back to the AI
-   ("tool round", costing `toolRoundSeconds`) before Grandma speaks again. */
+   Each AI reply costs `secondsPerTurn` of story time (plus an optional verbosity tax). Grandma's pleas
+   and the AI's thinking time cost nothing. If the scenario has virtual tools, a reply can call them;
+   the results go straight back to the AI, and its next reply costs `toolUseSeconds` per tool used. */
 (function (GB) {
   'use strict';
   const U = GB.U, P = GB.Prompts, Tools = GB.Tools;
+
+  // Safety limit: after this many tool results in a row within one turn, they wait for Grandma's next plea.
+  const MAX_TOOL_ROUNDS = 10;
 
   class RunEngine {
     /* opts: { profile, scenario, show, grannyMode, grannyProfile, judgeMode, judgeProfile,
@@ -44,7 +46,7 @@
       return sc.includeStatusLine && (sc.statusLine || '').trim() ? U.fill(sc.statusLine, this.vars(vt, T, k)) : '';
     }
 
-    // prefix: tool results that could not be sent during the previous turn (tool round limit).
+    // prefix: tool results held back by the safety limit on tool rounds in one turn.
     composeUser(k, grannyText, vt, T, prefix) {
       const sc = this.o.scenario;
       const v = this.vars(vt, T, k);
@@ -230,9 +232,11 @@
 
     async run() {
       const o = this.o, sc = o.scenario, show = this.show;
-      const timing = this.timing = Object.assign({ toolRoundSeconds: 5, maxToolRounds: 3 }, o.replay && o.replay.timing ? o.replay.timing : GB.Settings.timing(sc));
-      const T = timing.timeLimit, step = timing.secondsPerTurn, share = timing.grannyShare, tax = timing.verbosityTax;
-      const toolSec = timing.toolRoundSeconds, maxRounds = timing.maxToolRounds;
+      const timing = this.timing = o.replay && o.replay.timing ? Object.assign({}, o.replay.timing) : GB.Settings.timing(sc);
+      const T = timing.timeLimit, step = timing.secondsPerTurn, tax = timing.verbosityTax || 0;
+      // Runs saved by older versions can carry a share of each turn for Grandma's plea; replays honor it.
+      const share = timing.grannyShare || 0;
+      const toolSec = timing.toolUseSeconds != null ? timing.toolUseSeconds : timing.toolRoundSeconds != null ? timing.toolRoundSeconds : 5;
       this.maxTurns = Math.max(1, Math.ceil(T / step - 1e-9));
       this.toolsOn = !o.replay && Tools.active(sc);
       this.system = o.replay
@@ -304,6 +308,7 @@
           this.events.emit('granny', turn);
 
           let round = 0;
+          let toolUses = 0;               // tool results answered by this reply
           let replyStart = turn.tStart;   // story time this reply's cost is counted from
           let aiP = this._startAI(msgs, k, T - vt, round, turn);
           const tG = Math.min(T, vt + step * share);
@@ -327,7 +332,7 @@
             typed.push(typedNow);
             this.events.emit('ai', turn, reply);
 
-            const cost = (round === 0 ? step : toolSec) + (tax * reply.ai.length) / 100;
+            const cost = (round === 0 ? step : toolSec * toolUses) + (tax * reply.ai.length) / 100;
             const tLand = replyStart + cost;
             reply.tLand = turn.tLand = tLand;
             const inTime = tLand <= T + 1e-6;
@@ -391,7 +396,7 @@
               break turnLoop;
             }
 
-            const more = results.length > 0 && (o.replay ? !!this._replayReply(k, round + 1) : round < maxRounds);
+            const more = results.length > 0 && (o.replay ? !!this._replayReply(k, round + 1) : round < MAX_TOOL_ROUNDS);
             if (rec.granny.mode === 'ai' && !more) { grannyNext = this.grannyLine(k + 1, tLand, T); grannyNext.catch(() => {}); }
             await show.robotSpeak(resp, { from: vt, to: tLand, calls });
             this._check();
@@ -401,7 +406,7 @@
             this.events.emit('tool', turn, reply);
             const resultText = Tools.formatResults(results);
             if (!more) {
-              // Tool round limit for this turn: the results go out with the next message.
+              // Safety limit reached for this turn: the results go out with the next message.
               carry = resultText;
               reply.toolResultsDeferred = true;
               await show.toolResults(results, { from: vt, to: vt });
@@ -409,11 +414,12 @@
               break;
             }
             round++;
+            toolUses = results.length;
             const st = this.statusLine(k, vt, T);
             reply.toolMessage = o.replay ? (recorded.toolMessage || resultText) : resultText + (st ? '\n\n' + st : '');
             msgs.push({ role: 'user', content: reply.toolMessage });
             aiP = this._startAI(msgs, k, T - vt, round, turn);
-            const tR = Math.min(T, vt + toolSec * share);
+            const tR = Math.min(T, vt + toolSec * toolUses * share);
             await show.toolResults(results, { from: vt, to: tR });
             this._check();
             vt = tR;

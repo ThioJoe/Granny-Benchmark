@@ -53,10 +53,8 @@
       app: {
         timeLimit: 60,
         secondsPerTurn: 10,
-        grannyShare: 0.3,        // share of each turn's time that passes while Grandma pleads
         verbosityTax: 0,         // extra virtual seconds per 100 characters of AI reply
-        toolRoundSeconds: 5,     // story time for each tool result + the AI's next reply
-        maxToolRounds: 3,        // tool results sent back per turn before Grandma speaks again
+        toolUseSeconds: 5,       // story time each virtual tool use costs
         grannyMode: 'script',    // 'script' | 'ai'
         grannyModelId: '',
         judgeMode: 'auto',       // 'auto' | 'reference' | 'ai' | 'manual'
@@ -85,10 +83,22 @@
     };
   }
 
+  // Rules removed or renamed in 1.1: Grandma's share of a turn (now always 0), tool rounds per turn,
+  // and seconds per tool round (now seconds per tool use).
+  function migrateRules(o) {
+    if (!o || typeof o !== 'object') return;
+    if (o.toolUseSeconds == null && o.toolRoundSeconds != null) o.toolUseSeconds = o.toolRoundSeconds;
+    delete o.toolRoundSeconds;
+    delete o.maxToolRounds;
+    delete o.grannyShare;
+  }
+
   // Fill in any fields added in later versions without touching what the user set.
   function upgrade(s) {
     const d = defaults();
     const out = U.deepClone(s);
+    migrateRules(out.app);
+    if (Array.isArray(out.scenarios)) out.scenarios.forEach(migrateRules);
     for (const k of ['app', 'voice', 'audio', 'graphics', 'camera', 'security', 'ui']) {
       out[k] = U.deepMerge(U.deepClone(d[k]), out[k] || {});
     }
@@ -140,7 +150,7 @@
     'grannyPersona', 'judgeTarget', 'signLine1', 'signLine2', 'toolKeyword', 'toolsIntro'];
   const BENCH_LISTS = ['grannyLines', 'finalWords', 'successLines'];
   const BENCH_FLAGS = ['includeStatusLine', 'toolsEnabled'];
-  const BENCH_RULES = ['timeLimit', 'secondsPerTurn', 'grannyShare', 'verbosityTax', 'toolRoundSeconds', 'maxToolRounds'];
+  const BENCH_RULES = ['timeLimit', 'secondsPerTurn', 'verbosityTax', 'toolUseSeconds'];
   const TOOL_EFFECTS = ['none', 'glass', 'alarm', 'radio', 'horn'];
   const str = (v, max) => (v == null ? '' : String(v)).slice(0, max || 20000);
 
@@ -207,10 +217,8 @@
       return {
         timeLimit: Math.max(5, pick('timeLimit', 60)),
         secondsPerTurn: Math.max(1, pick('secondsPerTurn', 10)),
-        grannyShare: U.clamp(pick('grannyShare', 0.3), 0, 0.9),
         verbosityTax: Math.max(0, pick('verbosityTax', 0)),
-        toolRoundSeconds: Math.max(0, pick('toolRoundSeconds', 5)),
-        maxToolRounds: U.clamp(Math.round(pick('maxToolRounds', 3)), 0, 10),
+        toolUseSeconds: Math.max(0, pick('toolUseSeconds', 5)),
       };
     },
 
@@ -272,7 +280,8 @@
         for (const k of BENCH_TEXT) if (raw[k] != null) sc[k] = str(raw[k]);
         for (const k of BENCH_LISTS) if (Array.isArray(raw[k])) sc[k] = raw[k].filter((x) => typeof x === 'string' && x.trim()).slice(0, 200).map((x) => str(x, 2000));
         for (const k of BENCH_FLAGS) if (raw[k] != null) sc[k] = !!raw[k];
-        const rules = raw.rules && typeof raw.rules === 'object' ? raw.rules : raw;
+        const rules = Object.assign({}, raw.rules && typeof raw.rules === 'object' ? raw.rules : raw);
+        if (rules.toolUseSeconds == null && rules.toolRoundSeconds != null) rules.toolUseSeconds = rules.toolRoundSeconds;
         for (const k of BENCH_RULES) {
           const v = rules[k];
           sc[k] = v === null || v === undefined || v === '' || !isFinite(Number(v)) ? null : Number(v);
