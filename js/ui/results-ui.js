@@ -192,7 +192,8 @@
       const s = this.sel;
       if (!s.scenarios.size) s.scenarios.add(S.data.activeScenarioId);
       const running = GB.Batch.running;
-      const modelList = h('div.check-list', ...S.data.models.map((m) => {
+      for (const id of Array.from(s.models)) if (!S.modelListed(S.model(id))) s.models.delete(id);
+      const modelList = h('div.check-list', ...S.data.models.filter((m) => S.modelListed(m)).map((m) => {
         const ready = S.modelReady(m.id);
         const cb = h('input', { type: 'checkbox', checked: s.models.has(m.id), disabled: running });
         cb.addEventListener('change', () => { if (cb.checked) s.models.add(m.id); else s.models.delete(m.id); this._estimate(); });
@@ -219,7 +220,7 @@
         h('h1.page-title', 'Benchmark'),
         h('p.card-intro', 'Queue every selected model against every selected scenario, as many times as you like. Runs go one at a time and are saved to Results as they finish.'),
         h('div.bench-grid',
-          h('section.card', h('h2', 'Contestants'), h('div.btn-row', h('button.small', { onclick: () => { S.data.models.forEach((m) => { if (S.modelReady(m.id)) s.models.add(m.id); }); this.render(); } }, 'Select all ready'), h('button.small', { onclick: () => { s.models.clear(); this.render(); } }, 'Clear')), modelList),
+          h('section.card', h('h2', 'Contestants'), h('div.btn-row', h('button.small', { onclick: () => { S.data.models.forEach((m) => { if (S.modelUsable(m.id)) s.models.add(m.id); }); this.render(); } }, 'Select all ready'), h('button.small', { onclick: () => { s.models.clear(); this.render(); } }, 'Clear')), modelList),
           h('section.card', h('h2', 'Scenarios'), scList),
           h('section.card', h('h2', 'Options'),
             GB.Forms.field('Repetitions', reps),

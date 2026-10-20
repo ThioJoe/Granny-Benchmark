@@ -22,10 +22,10 @@ There is nothing to install or build.
 
 1. Download or clone this repository.
 2. Open `index.html` in Chrome, Edge, or Firefox (a recent version with WebGL2). Double-clicking the file is enough; no web server is needed.
-3. Press **Start run**. The default contestant is a **Simulated AI**, which works offline without any API key, so you can watch the full show first.
+3. Press **Start run**. The default contestant is a **Simulated AI**, which works offline without any API key, so you can watch the full show first. Once you use real models, you can hide the simulated AIs from all model lists in the configuration window (Simulated AIs).
 4. To test real models, click the gear button (⚙, top right) and open **API keys & security**, add your API keys, then pick a model in the Arena.
 
-Everything you can configure (scenarios and tools, keys, providers, models, rules, voices, graphics) is in the configuration window behind the gear button. It opens over whatever page you are on, shows one section at a time, and does not interrupt a run.
+Everything you can configure (scenarios and tools, keys, providers, models, simulated AIs, rules, voices, graphics) is in the configuration window behind the gear button. It opens over whatever page you are on, shows one section at a time, and does not interrupt a run.
 
 The project has no third-party dependencies: the 3D engine, the API clients, the speech, and the sound effects are all written in plain JavaScript using browser APIs.
 
@@ -118,7 +118,9 @@ API usage costs money. A run makes one request per turn to the model under test 
 
 ## Voices and sound
 
-Dialogue is spoken with the Web Speech API, which uses your operating system's voices, so no audio is sent anywhere. Each role (Grandma, the AI, the narrator) has its own voice, rate, and pitch (configuration window, Voices & audio). When a virtual tool answers, the narrator voice reads the result as the station terminal. macOS includes voices named "Grandma" and "Fred" that suit this well; on Windows, Zira and David work. If a browser has no voices, speech is simulated so the mouths and speech bubbles still keep time. Sound effects (train, horn, brakes, impact, breaking glass, siren) are synthesized with the Web Audio API.
+Dialogue is spoken with the Web Speech API, which uses your operating system's voices, so no audio is sent anywhere. Each role (Grandma, the AI, the narrator) has its own voice, rate, and pitch (configuration window, Voices & audio). When a virtual tool answers, the narrator voice reads the result as the station terminal. macOS includes voices named "Grandma" and "Fred" that suit this well; on Windows, Zira and David work. If a browser has no voices, speech is simulated so the mouths and speech bubbles still keep time.
+
+The controls at the bottom right of the 3D view work on whatever is being said: **Skip line** ends the current line and moves on, **Faster line** speeds up the rest of the current line by 1.5× per press (the next line is back to normal speed), and **− / +** set the speed of all voices. Story time runs with the speech, so faster voices also make the show move faster. A voice can't change speed in the middle of a sentence, so Faster line restarts the voice from the current word. Sound effects (train, horn, brakes, impact, breaking glass, siren) are synthesized with the Web Audio API.
 
 ## Controls
 
@@ -129,6 +131,9 @@ Dialogue is spoken with the Web Speech API, which uses your operating system's v
 | `1`-`8` | Camera presets (overview, Grandma, robot, terminal screen, track, side, wide, train) |
 | `R` | Back to the automatic camera, which cuts between shots during a run |
 | `M` | Mute sound and voices |
+| `N` | Skip the line being spoken |
+| `.` | Speed up the rest of the line being spoken (1.5× per press) |
+| `-` / `+` | Slower / faster voices |
 | `G` | Open the configuration window |
 | `T` | Show or hide the side panel |
 

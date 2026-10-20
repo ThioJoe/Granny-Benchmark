@@ -35,6 +35,24 @@
 
     danger() { return U.clamp(this.vt / this.T, 0, 1); }
 
+    // ---- Arena voice controls ----
+    get speaking() { return this.handles.size > 0; }
+
+    // Skip the line being spoken; the show moves on to the next beat.
+    skip() { for (const h of Array.from(this.handles)) h.cancel(); }
+
+    // Speed up the rest of the line being spoken (and the clock that runs with it).
+    fastForward(f) {
+      f = f || 1.5;
+      let any = false;
+      for (const h of this.handles) if (h.boost && !h.finished) { h.boost(f); any = true; }
+      if (any && this.drive && !this.drive.finishing) this.drive.est = Math.max(0.3, this.drive.est / f);
+      return any;
+    }
+
+    // How much the current line is sped up (1 = not at all).
+    get boost() { let b = 1; for (const h of this.handles) if (!h.finished) b = Math.max(b, h.boostFactor || 1); return b; }
+
     // ---------------------------------------------------------------------------
     begin(rec) {
       this.rec = rec;

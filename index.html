@@ -69,6 +69,16 @@
       <div id="hud-model" class="hud-model hidden"></div>
       <div id="hud-fps" class="fps hidden"></div>
 
+      <div id="play-controls" aria-label="Voice controls">
+        <button id="btn-ff" type="button" title="Speed up the rest of the line being spoken, 1.5x per press (.)" disabled>&#9193;<span class="pc-label"> Faster line</span></button>
+        <button id="btn-skip" type="button" title="Skip the line being spoken (N)" disabled>&#9197;<span class="pc-label"> Skip line</span></button>
+        <span class="speed-ctl" title="Voice speed for every line (- and + keys)">
+          <button id="btn-slower" type="button" aria-label="Slower voices">&minus;</button>
+          <span id="speed-val">1&times;</span>
+          <button id="btn-faster" type="button" aria-label="Faster voices">+</button>
+        </span>
+      </div>
+
       <div id="cam-controls">
         <button id="cam-auto" type="button" class="active">Auto camera</button>
         <button id="cam-mode" type="button">Orbit mode</button>

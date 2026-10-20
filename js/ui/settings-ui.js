@@ -54,8 +54,13 @@
           break;
         case 'models':
           this.modelsBox = h('div');
-          r.appendChild(sect('Models', 'Each model profile is a contestant you can pick in the Arena or the Benchmark. Leave temperature empty: many current models reject custom sampling values.', this.modelsBox));
+          r.appendChild(sect('Models', 'Each model profile is a contestant you can pick in the Arena or the Benchmark. Leave temperature empty: many current models reject custom sampling values. The offline demo AIs are under Simulated AIs.', this.modelsBox));
           this._renderModels();
+          break;
+        case 'sims':
+          this.simsBox = h('div');
+          r.appendChild(sect('Simulated AIs', 'Offline demo contestants. They need no API key and follow a fixed script (refuse, give in at the last second, fake the lyrics, use the virtual tools, ...), so you can watch the show and try scenarios without spending anything.', this.simsBox));
+          this._renderSims();
           break;
         case 'rules':
           this.rulesBox = h('div');
@@ -250,14 +255,41 @@
       box.appendChild(fetchRow);
 
       const list = h('div.model-list');
-      for (const m of S.data.models) list.appendChild(this._modelCard(m));
+      for (const m of S.data.models) if (!S.isSimulated(m)) list.appendChild(this._modelCard(m));
       box.appendChild(list);
-      const provSel = h('select.input', ...providers.map((p) => h('option', { value: p.id }, p.name)));
+      const provSel = h('select.input', ...providers.filter((p) => p.type !== 'simulated').map((p) => h('option', { value: p.id }, p.name)));
       box.appendChild(h('div.btn-row', h('span', 'Add a model for '), provSel, h('button.primary', { onclick: () => {
         const p = S.provider(provSel.value);
         S.data.models.push({ id: U.uid('m'), name: 'New ' + p.name.split(' ')[0] + ' model', providerId: p.id, model: '', maxTokens: p.type === 'simulated' ? null : 16000, temperature: null, effort: '', stream: true, extraBody: '' });
         F.saveNow(); this._renderModels(); GB.App.refreshArena();
       } }, 'Add model')));
+    },
+
+    _renderSims() {
+      const box = this.simsBox;
+      if (!box) return;
+      U.clear(box);
+      const a = S.data.app;
+      box.appendChild(h('div.sim-toggle', F.check(a, 'showSimulated', 'Show the simulated AIs in the Arena and the Benchmark (and as Grandma or judge models)', {
+        onChange: () => { F.saveNow(); GB.App.refreshArena(); this._renderSims(); },
+      })));
+      box.appendChild(h('datalist#models-simulated', ...GB.Prompts.SIM_MODELS.map((m) => h('option', { value: m.id }, m.name))));
+      const sims = S.data.models.filter((m) => S.isSimulated(m));
+      const list = h('div.model-list' + (a.showSimulated === false ? '.dim' : ''));
+      for (const m of sims) list.appendChild(this._modelCard(m));
+      if (!sims.length) list.appendChild(h('p.muted', 'No simulated AIs.'));
+      box.appendChild(list);
+      box.appendChild(h('div.btn-row', h('button', { onclick: () => {
+        let n = 0;
+        for (const sm of GB.Prompts.SIM_MODELS) {
+          if (S.data.models.some((x) => S.isSimulated(x) && x.model === sm.id)) continue;
+          S.data.models.splice(S.data.models.filter((x) => S.isSimulated(x)).length, 0, { id: U.uid('m'), name: sm.name, providerId: 'simulated', model: sm.id, maxTokens: null, temperature: null, effort: '', stream: true, extraBody: '' });
+          n++;
+        }
+        F.saveNow(); this._renderSims(); GB.App.refreshArena();
+        U.toast(n ? 'Restored ' + n + ' simulated AI(s)' : 'All simulated AIs are already there');
+      } }, 'Restore missing simulated AIs')));
+      box.appendChild(h('p.muted.small', 'The Model ID picks the personality: ' + GB.Prompts.SIM_MODELS.map((m) => m.id).join(', ') + '.'));
     },
 
     _modelCard(m) {
@@ -280,16 +312,16 @@
         h('button.small', { onclick: () => {
           const copy = Object.assign(U.deepClone(m), { id: U.uid('m'), name: m.name + ' (copy)' });
           S.data.models.splice(S.data.models.indexOf(m) + 1, 0, copy);
-          F.saveNow(); this._renderModels(); GB.App.refreshArena();
+          F.saveNow(); this.render(); GB.App.refreshArena();
         } }, 'Duplicate'),
         h('button.small.danger', { onclick: async () => {
           if (!(await GB.Modal.confirm('Delete model?', 'Delete "' + m.name + '"? Saved results keep their data.', 'Delete', true))) return;
           S.data.models = S.data.models.filter((x) => x !== m);
-          F.saveNow(); this._renderModels(); GB.App.refreshArena();
+          F.saveNow(); this.render(); GB.App.refreshArena();
         } }, 'Delete'));
       const fields = [
         F.field('Display name', F.text(m, 'name', { onChange: () => { head.querySelector('b').textContent = m.name; GB.App.refreshArena(); } })),
-        F.field('Provider', F.select(m, 'providerId', S.data.providers.map((x) => [x.id, x.name]), { onChange: () => { F.saveNow(); this._renderModels(); GB.App.refreshArena(); } })),
+        F.field('Provider', F.select(m, 'providerId', S.data.providers.filter((x) => x.id === m.providerId || x.type !== 'simulated' || S.data.app.showSimulated !== false).map((x) => [x.id, x.name]), { onChange: () => { F.saveNow(); this.render(); GB.App.refreshArena(); } })),
         F.field('Model ID', F.text(m, 'model', { list: 'models-' + m.providerId, placeholder: ptype === 'gemini' ? 'gemini-3.8-flash' : ptype === 'anthropic' ? 'claude-opus-5-5' : 'model id' })),
       ];
       if (ptype !== 'simulated') {
@@ -307,7 +339,8 @@
     _renderRules() {
       const box = this.rulesBox, a = S.data.app;
       U.clear(box);
-      const modelOpts = [['', '(none)']].concat(S.data.models.map((m) => [m.id, m.name + (S.modelReady(m.id) ? '' : ' (needs key)')]));
+      // Hidden simulated AIs are left out (a hidden choice shows as "(none)" and is not used).
+      const modelOpts = [['', '(none)']].concat(S.data.models.filter((m) => S.modelListed(m)).map((m) => [m.id, m.name + (S.modelReady(m.id) ? '' : ' (needs key)')]));
       const T = S.timing(null);
       const turnsInfo = h('span.field-hint');
       const syncTurns = () => { const t = S.timing(null); turnsInfo.textContent = 'With these settings the AI gets ' + Math.ceil(t.timeLimit / t.secondsPerTurn - 1e-9) + ' replies before impact.'; };
@@ -348,6 +381,7 @@
       const voices = GB.TTS.voices;
       box.appendChild(h('div.form-grid',
         F.check(v, 'enabled', 'Speak the dialogue', { onChange: () => GB.App._muteIcon() }),
+        F.field('Voice speed (all voices)', F.range(v, 'speed', { min: 0.5, max: 3, step: 0.05, fmt: (x) => x.toFixed(2) + 'x', onChange: () => GB.App._voiceSpeedLabel() }), 'Same as the speed control on the 3D view (- and + keys). Multiplies each voice’s own rate below.'),
         F.field('Max characters the AI speaks per reply', F.number(v, 'maxRobotChars', { min: 50, max: 10000, step: 50 }), 'Long replies (like full lyrics) are cut off in speech, not in the transcript.')));
       if (!GB.TTS.supported) box.appendChild(h('p.warning', 'This browser has no speech synthesis. Speech will be simulated (mouths still move).'));
       else if (!voices.length) box.appendChild(h('p.muted', 'No voices reported yet. Some browsers load them after a moment, or only after the first click on the page.'));

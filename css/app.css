@@ -293,6 +293,12 @@ body:not([data-tab="arena"]) #panel-toggle { display: none; }
 .bubble.fading { opacity: 0; }
 
 /* ---------- camera toolbar ---------- */
+#play-controls { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 6px; z-index: 3; }
+#play-controls button { background: rgba(14, 16, 22, 0.8); border-color: rgba(255, 255, 255, 0.12); font-size: 12px; padding: 5px 10px; backdrop-filter: blur(6px); white-space: nowrap; }
+#play-controls button.active { border-color: var(--accent); color: var(--accent); }
+#play-controls .speed-ctl { display: inline-flex; align-items: center; background: rgba(14, 16, 22, 0.8); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; backdrop-filter: blur(6px); }
+#play-controls .speed-ctl button { background: transparent; border: none; padding: 5px 9px; font-size: 14px; font-weight: 700; }
+#play-controls #speed-val { font-size: 12px; min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
 #cam-controls { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; z-index: 3; max-width: calc(100% - 24px); }
 #cam-controls button, #cam-controls select { background: rgba(14, 16, 22, 0.8); border-color: rgba(255, 255, 255, 0.12); font-size: 12px; padding: 5px 10px; backdrop-filter: blur(6px); }
 #cam-controls select { width: auto; color: var(--text); border-radius: 8px; }
@@ -366,6 +372,8 @@ body.running #cam-controls .hint { display: none; }
 .sc-pick { width: auto; min-width: 240px; max-width: 100%; flex: 1; }
 .sc-editor textarea.input { font-size: 13px; }
 .tool-card .subcard-head { margin-bottom: 6px; }
+.sim-toggle { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-2); margin-bottom: 8px; }
+.model-list.dim { opacity: 0.55; }
 .tool-card.off { opacity: 0.6; }
 .tool-name { flex: 1; min-width: 180px; }
 .tool-name .input { font-family: var(--mono); font-weight: 700; letter-spacing: 0.02em; }
@@ -434,6 +442,8 @@ button.linkish:hover:not(:disabled) { background: none; color: #ffe07a; }
   .clock-box { min-width: 110px; }
   .hud-model { display: none; }
   #cam-controls .hint { display: none; }
+  #play-controls { bottom: 52px; }
+  #play-controls .pc-label { display: none; }
   .page-layout { flex-direction: column; padding: 16px; }
   .key-row { grid-template-columns: 1fr; }
   .modal.config { height: calc(100vh - 32px); }
@@ -450,6 +460,7 @@ button.linkish:hover:not(:disabled) { background: none; color: #ffe07a; }
   .two-col { grid-template-columns: 1fr; }
   .rc-stats { grid-template-columns: repeat(2, 1fr); }
   .modal-backdrop { padding: 6px; }
+  #play-controls { bottom: 90px; }
   .modal.config { height: calc(100vh - 12px); padding: 12px; }
   .cfg-tab span:not(.cfg-icon) { font-size: 12.5px; }
   .sc-top { position: static; }

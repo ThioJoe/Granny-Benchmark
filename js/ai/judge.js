@@ -72,8 +72,7 @@
         return mode;
       }
       if ((scenario.referenceLyrics || '').trim()) return 'reference';
-      const jm = s.data.app.judgeModelId;
-      if (jm && s.modelReady(jm)) return 'ai';
+      if (s.modelUsable(s.data.app.judgeModelId)) return 'ai';
       return 'manual';
     },
 

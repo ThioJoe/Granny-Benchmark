@@ -9,6 +9,7 @@
     ['keys', 'API keys & security', '🔑'],
     ['providers', 'Providers', '🌐'],
     ['models', 'Models', '🤖'],
+    ['sims', 'Simulated AIs', '🧪'],
     ['rules', 'Benchmark rules', '⏱'],
     ['voices', 'Voices & audio', '🔊'],
     ['graphics', 'Graphics & camera', '🎥'],

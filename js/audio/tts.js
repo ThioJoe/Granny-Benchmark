@@ -88,10 +88,14 @@
       return this.defaultVoice(role);
     },
 
+    // Overall voice speed (the Arena's voice speed control); multiplies every role's rate.
+    voiceSpeed() { return U.clamp(Number(GB.Settings.data.voice.speed) || 1, 0.25, 4); },
+
     estimate(text, role) {
       const cfg = GB.Settings.data.voice[role] || {};
       const words = U.speakable(text).split(/\s+/).filter(Boolean);
-      return words.reduce((a, w) => a + wordSeconds(w, cfg.rate || 1), 0.3);
+      const rate = (cfg.rate || 1) * this.voiceSpeed();
+      return words.reduce((a, w) => a + wordSeconds(w, rate), 0.3);
     },
 
     stopAll() {
@@ -99,8 +103,10 @@
       if (synth) { try { synth.cancel(); } catch (e) { /* ignore */ } }
     },
 
-    /* Speak text as a role. Returns a handle: { promise, cancel(), words, estimate }.
-       opts: { onWord(i, word), onStart(), simulate: bool, speed: number, volumeRamp: [a, b] } */
+    /* Speak text as a role. Returns a handle: { promise, cancel(), boost(factor), words, estimate, wordIndex, boostFactor }.
+       opts: { onWord(i, word), onStart(), simulate: bool, speed: number, volumeRamp: [a, b] }
+       Rate = the role's rate x the overall voice speed x the fast-show factor x the handle's boost.
+       boost() speeds up the rest of this line only (the "fast-forward line" button). */
     speak(role, rawText, opts) {
       opts = opts || {};
       const vcfg = GB.Settings.data.voice;
@@ -108,10 +114,12 @@
       const text = U.speakable(rawText);
       const words = text.split(/\s+/).filter(Boolean);
       const speed = opts.speed || 1;
-      const rate = U.clamp((cfg.rate || 1) * (speed > 1 ? Math.min(2, speed) : 1), 0.3, 3);
-      const estimate = words.reduce((a, w) => a + wordSeconds(w, rate), 0.3);
+      const showFactor = speed > 1 ? Math.min(2, speed) : 1;
       const done = U.deferred();
-      const handle = { words, estimate, promise: done.promise, cancelled: false, finished: false };
+      const handle = { words, estimate: 0, promise: done.promise, cancelled: false, finished: false, wordIndex: 0, boostFactor: 1 };
+      // Read live, so a speed change applies from the next word (simulated speech) or the next chunk (real voices).
+      const rateNow = () => U.clamp((cfg.rate || 1) * this.voiceSpeed() * showFactor * handle.boostFactor, 0.2, 4);
+      handle.estimate = words.reduce((a, w) => a + wordSeconds(w, rateNow()), 0.3);
       const finish = (cancelled) => {
         if (handle.finished) return;
         handle.finished = true;
@@ -131,23 +139,37 @@
         const step = () => {
           if (handle.finished) return;
           if (i >= words.length) { finish(false); return; }
+          handle.wordIndex = i;
           try { opts.onWord && opts.onWord(i, words[i]); } catch (e) { console.error(e); }
-          const d = wordSeconds(words[i], rate) / factor;
+          const d = wordSeconds(words[i], rateNow()) / factor;
           i++;
           handle._timer = setTimeout(step, d * 1000);
         };
         handle.cancel = () => finish(true);
+        handle.boost = (f) => { if (!handle.finished) handle.boostFactor = U.clamp(handle.boostFactor * (f || 1.5), 1, 4); };
         if (opts.onStart) opts.onStart();
         if (!words.length) setTimeout(() => finish(false), 50); else step();
         return handle;
       }
 
       // real speech, chunked (Chrome stops long utterances), with per-chunk watchdogs
+      const ramp = opts.volumeRamp;
       // With a volume ramp, use short phrases: volume can only change between utterances.
-      const chunks = opts.volumeRamp ? splitChunks(text.replace(/,\s*/g, ',\n'), 40) : splitChunks(text, 170);
+      const chunkText = (t) => (ramp ? splitChunks(t.replace(/,\s*/g, ',\n'), 40) : splitChunks(t, 170));
+      let chunks = chunkText(text);
       let wordBase = 0;
       let ci = 0;
-      const ramp = opts.volumeRamp;
+      let current = null;     // { u, fake } for the utterance being spoken
+      let started = false;
+      // Stop listening to the current utterance (before cancelling it, which would otherwise end the line).
+      const detach = () => {
+        if (!current) return;
+        const u = current.u;
+        u.onend = u.onerror = u.onboundary = u.onstart = null;
+        clearTimeout(current.fake);
+        const i = this._keep.indexOf(u); if (i >= 0) this._keep.splice(i, 1);
+        current = null;
+      };
       const speakChunk = () => {
         if (handle.finished) return;
         if (ci >= chunks.length) { finish(false); return; }
@@ -156,47 +178,49 @@
         const starts = [];
         { let pos = 0; for (const w of chunkWords) { const k = chunk.indexOf(w, pos); starts.push(k); pos = k + w.length; } }
         const u = new SpeechSynthesisUtterance(chunk);
+        const cur = current = { u, fake: null };
+        const rate = rateNow();
         u.voice = voice;
         u.lang = voice.lang || 'en-US';
         u.rate = rate;
         u.pitch = U.clamp(cfg.pitch == null ? 1 : cfg.pitch, 0, 2);
         const vol = cfg.volume == null ? 1 : cfg.volume;
-        u.volume = ramp ? vol * U.lerp(ramp[0], ramp[1], chunks.length > 1 ? ci / (chunks.length - 1) : 0) : vol;
+        u.volume = ramp ? vol * U.lerp(ramp[0], ramp[1], words.length > 1 ? wordBase / (words.length - 1) : 0) : vol;
         const myBase = wordBase;
         let gotBoundary = false;
+        const word = (k) => {
+          handle.wordIndex = myBase + k;
+          try { opts.onWord && opts.onWord(myBase + k, words[myBase + k]); } catch (err) { console.error(err); }
+        };
         u.onboundary = (e) => {
           if (e.name && e.name !== 'word') return;
           gotBoundary = true;
           let wi = 0;
           for (let k = 0; k < starts.length; k++) if (starts[k] <= e.charIndex) wi = k;
-          try { opts.onWord && opts.onWord(myBase + wi, words[myBase + wi]); } catch (err) { console.error(err); }
+          word(wi);
         };
-        let fallbackTimer = null;
         u.onstart = () => {
-          if (ci === 0 && opts.onStart) opts.onStart();
+          if (!started) { started = true; if (opts.onStart) opts.onStart(); }
           // If the voice never reports word boundaries, fake them so the mouth still moves.
           let k = 0;
           const fake = () => {
-            if (handle.finished || gotBoundary || k >= chunkWords.length) return;
-            try { opts.onWord && opts.onWord(myBase + k, words[myBase + k]); } catch (err) { console.error(err); }
-            fallbackTimer = setTimeout(fake, wordSeconds(chunkWords[k], rate) * 1000);
+            if (handle.finished || gotBoundary || k >= chunkWords.length || current !== cur) return;
+            word(k);
+            cur.fake = setTimeout(fake, wordSeconds(chunkWords[k], rate) * 1000);
             k++;
           };
-          fallbackTimer = setTimeout(fake, 250);
+          cur.fake = setTimeout(fake, 250);
         };
+        const advance = () => { wordBase += chunkWords.length; ci++; speakChunk(); };
         const next = () => {
           clearTimeout(handle._timer);
-          clearTimeout(fallbackTimer);
-          const i = this._keep.indexOf(u); if (i >= 0) this._keep.splice(i, 1);
-          if (handle.finished) return;
-          wordBase += chunkWords.length;
-          ci++;
-          speakChunk();
+          if (current === cur) detach();
+          if (!handle.finished) advance();
         };
         u.onend = next;
         u.onerror = (e) => {
           if (e && (e.error === 'interrupted' || e.error === 'canceled')) {
-            const i = this._keep.indexOf(u); if (i >= 0) this._keep.splice(i, 1);
+            if (current === cur) detach();
             finish(true);
             return;
           }
@@ -207,17 +231,30 @@
         clearTimeout(handle._timer);
         handle._timer = setTimeout(() => {
           console.warn('[GB] speech watchdog fired');
-          // Detach first: the cancelled utterance reports "interrupted", which would end the whole line.
-          u.onend = u.onerror = u.onboundary = null;
+          if (current === cur) detach();
           try { synth.cancel(); } catch (e) { /* */ }
-          next();
+          if (!handle.finished) advance();
         }, (est * 2.2 + 4) * 1000);
         try { synth.speak(u); } catch (e) { next(); }
       };
       handle.cancel = () => {
         if (handle.finished) return;
         finish(true);
+        detach();
         try { synth.cancel(); } catch (e) { /* ignore */ }
+      };
+      // A voice cannot change speed in the middle of an utterance, so restart from the current word.
+      handle.boost = (f) => {
+        if (handle.finished) return;
+        handle.boostFactor = U.clamp(handle.boostFactor * (f || 1.5), 1, 4);
+        const from = U.clamp(handle.wordIndex, 0, Math.max(0, words.length - 1));
+        clearTimeout(handle._timer);
+        detach();
+        try { synth.cancel(); } catch (e) { /* ignore */ }
+        chunks = chunkText(words.slice(from).join(' '));
+        wordBase = from;
+        ci = 0;
+        setTimeout(speakChunk, 60);
       };
       // Chrome can get stuck "speaking" after an earlier cancel; resetting first is cheap.
       if (synth.speaking || synth.pending) { try { synth.cancel(); } catch (e) { /* */ } setTimeout(speakChunk, 60); }

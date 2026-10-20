@@ -199,6 +199,10 @@
         if (el && el.offsetParent && !el.classList.contains('hidden')) inset = Math.max(inset, el.offsetLeft + el.offsetWidth + 12);
       }
       if (inset > W * 0.45) inset = 12;
+      let insetR = 12;
+      const pc = document.getElementById('play-controls');
+      if (pc && pc.offsetParent) insetR = Math.max(insetR, W - pc.offsetLeft + 12);
+      if (insetR > W * 0.45) insetR = 12;
       for (const who of ['narrator', 'robot', 'granny']) {
         const it = this.items[who];
         if (!it.visible) continue;
@@ -213,11 +217,11 @@
           it.el.style.setProperty('--tail', U.clamp(tmp.x - x, 18, bw - 18) + 'px');
         }
         if (docked) {
-          x = U.clamp((W - bw) / 2, inset, Math.max(inset, W - bw - 12));
+          x = U.clamp((W - bw) / 2, inset, Math.max(inset, W - bw - insetR));
           y = dockY - bh;
           dockY = y - 8;
         }
-        const maxW = docked ? Math.max(240, Math.min(720, W - inset - 16)) + 'px' : '';
+        const maxW = docked ? Math.max(240, Math.min(720, W - inset - insetR - 4)) + 'px' : '';
         if (it.el.style.maxWidth !== maxW) it.el.style.maxWidth = maxW;
         it.el.classList.toggle('docked', docked);
         it.el.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';

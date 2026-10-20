@@ -42,6 +42,7 @@
       this._bindTopbar();
       this._bindArena();
       this._bindCamera();
+      this._bindVoiceControls();
       this.refreshArena();
       GB.SettingsUI.init();
       GB.ScenariosUI.init();
@@ -92,6 +93,64 @@
       }
       GB.Bubbles.frame();
       GB.HUD.frame(dt, this.fps);
+      this._syncVoiceControls();
+    },
+
+    // ---------------------------------------------------------------------------
+    // voice controls on the 3D view: skip a line, fast-forward a line, overall voice speed
+    // ---------------------------------------------------------------------------
+    SPEEDS: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3],
+
+    _bindVoiceControls() {
+      U.$('#btn-skip').addEventListener('click', () => this.skipLine());
+      U.$('#btn-ff').addEventListener('click', () => this.fastForwardLine());
+      U.$('#btn-slower').addEventListener('click', () => this.stepVoiceSpeed(-1));
+      U.$('#btn-faster').addEventListener('click', () => this.stepVoiceSpeed(1));
+      this._voiceSpeedLabel();
+    },
+
+    _speaking() { return this.show ? this.show.speaking : GB.TTS.active.size > 0; },
+
+    skipLine() {
+      if (this.show && this.show.speaking) this.show.skip();
+      else GB.TTS.stopAll();
+    },
+
+    fastForwardLine() {
+      if (this.show) this.show.fastForward(1.5);
+      else for (const h of GB.TTS.active) if (h.boost) h.boost(1.5);
+    },
+
+    stepVoiceSpeed(dir) {
+      const cur = Number(S.data.voice.speed) || 1;
+      const list = this.SPEEDS;
+      let i = list.findIndex((x) => x >= cur - 1e-6);
+      if (i < 0) i = list.length - 1;
+      if (dir > 0 && list[i] <= cur + 1e-6) i++;
+      else if (dir < 0) i--;
+      S.data.voice.speed = list[U.clamp(i, 0, list.length - 1)];
+      S.save();
+      this._voiceSpeedLabel();
+    },
+
+    _voiceSpeedLabel() {
+      const v = Number(S.data.voice.speed) || 1;
+      U.$('#speed-val').textContent = '🗣 ' + (Math.round(v * 100) / 100) + '×';
+      U.$('#btn-slower').disabled = v <= this.SPEEDS[0] + 1e-6;
+      U.$('#btn-faster').disabled = v >= this.SPEEDS[this.SPEEDS.length - 1] - 1e-6;
+    },
+
+    _syncVoiceControls() {
+      const speaking = this._speaking();
+      const boost = this.show ? this.show.boost : 1;
+      const key = speaking + '|' + boost;
+      if (key === this._vcKey) return;
+      this._vcKey = key;
+      U.$('#btn-skip').disabled = !speaking;
+      const ff = U.$('#btn-ff');
+      ff.disabled = !speaking || boost >= 3.99;
+      ff.classList.toggle('active', boost > 1.01);
+      ff.querySelector('.pc-label').textContent = boost > 1.01 ? ' ' + (Math.round(boost * 10) / 10) + '× line' : ' Faster line';
     },
 
     _wireWorldSounds() {
@@ -211,6 +270,10 @@
       const k = e.key.toLowerCase();
       if (k === 'm') this.toggleMute();
       else if (k === 'g') { e.preventDefault(); GB.ConfigUI.open(); }
+      else if (k === 'n') this.skipLine();
+      else if (k === '.') this.fastForwardLine();
+      else if (k === '-' || k === '_') this.stepVoiceSpeed(-1);
+      else if (k === '=' || k === '+') this.stepVoiceSpeed(1);
       else if (k === 't' && this.tab === 'arena') U.$('#panel-toggle').click();
       else if (k === 'escape' && this.tab !== 'arena') this.setTab('arena');
     },
@@ -249,7 +312,10 @@
       const d = S.data;
       U.clear(selM);
       const groups = new Map();
+      // The simulated AIs can be hidden (configuration window > Simulated AIs).
+      if (!S.modelListed(S.model(d.testModelId))) { const first = d.models.find((m) => S.modelListed(m)); if (first) d.testModelId = first.id; }
       for (const m of d.models) {
+        if (!S.modelListed(m)) continue;
         const p = S.provider(m.providerId);
         const gname = p ? p.name : 'Missing provider';
         if (!groups.has(gname)) groups.set(gname, []);
@@ -273,6 +339,7 @@
       if (document.activeElement !== peS) peS.value = sc.systemPrompt || '';
       if (document.activeElement !== peB) peB.value = sc.briefing || '';
       U.$('#chk-voices').checked = !!d.voice.enabled;
+      this._voiceSpeedLabel();
       if (this.world && !this.running) this.world.setScenario(sc);
       this._arenaWarnings();
     },
@@ -286,13 +353,13 @@
         if (GB.Vault.status() === 'locked') msgs.push(['Your saved keys are locked. ', h('button.linkish', { type: 'button', onclick: () => this.unlockVault() }, 'Unlock them'), ' to run "' + m.name + '".']);
         else msgs.push(['No API key for ' + ((S.provider(m.providerId) || {}).name || 'this provider') + '. ', link('Add a key', 'keys'), ' or pick a Simulated AI.']);
       }
-      if (d.app.grannyMode === 'ai' && !(d.app.grannyModelId && S.modelReady(d.app.grannyModelId))) msgs.push(['AI Grandma needs a Grandma model with a key (', link('Benchmark rules', 'rules'), '). Scripted lines will be used.']);
+      if (d.app.grannyMode === 'ai' && !S.modelUsable(d.app.grannyModelId)) msgs.push(['AI Grandma needs a Grandma model with a key (', link('Benchmark rules', 'rules'), '). Scripted lines will be used.']);
       const sc = S.activeScenario();
       const jm = GB.Judge.resolveMode(d.app.judgeMode, sc);
       const simulated = m && (S.provider(m.providerId) || {}).type === 'simulated';
       if (simulated) { /* simulated AIs report their own verdicts */ }
-      else if (jm === 'manual' || (jm === 'ai-or-manual' && !(d.app.judgeModelId && S.modelReady(d.app.judgeModelId)))) msgs.push(['Judge: you will be asked to judge each reply yourself (no reference lyrics and no ', link('AI judge', 'rules'), ' set).']);
-      else if (d.app.judgeMode === 'ai' && !(d.app.judgeModelId && S.modelReady(d.app.judgeModelId))) msgs.push(['AI judge selected but no judge model with a key is set (', link('Benchmark rules', 'rules'), '). You will judge manually.']);
+      else if (jm === 'manual' || (jm === 'ai-or-manual' && !S.modelUsable(d.app.judgeModelId))) msgs.push(['Judge: you will be asked to judge each reply yourself (no reference lyrics and no ', link('AI judge', 'rules'), ' set).']);
+      else if (d.app.judgeMode === 'ai' && !S.modelUsable(d.app.judgeModelId)) msgs.push(['AI judge selected but no judge model with a key is set (', link('Benchmark rules', 'rules'), '). You will judge manually.']);
       U.clear(box);
       box.classList.toggle('hidden', !msgs.length);
       for (const t of msgs) box.appendChild(h('div', t));
@@ -323,8 +390,8 @@
       const d = S.data;
       const grannyMode = opts.grannyMode || d.app.grannyMode;
       const judgeMode = opts.judgeMode || d.app.judgeMode;
-      const grannyProfile = grannyMode === 'ai' && d.app.grannyModelId && S.modelReady(d.app.grannyModelId) ? S.model(d.app.grannyModelId) : null;
-      const judgeProfile = d.app.judgeModelId && S.modelReady(d.app.judgeModelId) ? S.model(d.app.judgeModelId) : null;
+      const grannyProfile = grannyMode === 'ai' && S.modelUsable(d.app.grannyModelId) ? S.model(d.app.grannyModelId) : null;
+      const judgeProfile = S.modelUsable(d.app.judgeModelId) ? S.model(d.app.judgeModelId) : null;
       if (opts.mode !== 'headless' && this.tab !== 'arena') this.setTab('arena');
       this.hideResultCard();
       const show = this.show = new GB.Show({ world: this.world, mode: opts.mode || 'full' });

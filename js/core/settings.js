@@ -66,9 +66,11 @@
         endingStyle: 'random',   // 'random' | 'orbit' | 'ornament' | 'bowling'
         narratorIntro: true,
         retryLimit: 2,
+        showSimulated: true,     // list the offline simulated AIs in the Arena, Benchmark, and Grandma/judge choices
       },
       voice: {
         enabled: true,
+        speed: 1,                // overall voice speed (Arena control), multiplies each role's rate
         granny: { voiceURI: '', rate: 0.95, pitch: 1.5, volume: 1 },
         robot: { voiceURI: '', rate: 1.05, pitch: 0.55, volume: 1 },
         narrator: { voiceURI: '', rate: 0.95, pitch: 0.8, volume: 1 },
@@ -186,6 +188,11 @@
       const m = this.model(modelId);
       return !!m && this.providerReady(m.providerId);
     },
+    isSimulated(m) { const p = m && this.provider(m.providerId); return !!p && p.type === 'simulated'; },
+    // Models that can be picked (the simulated AIs can be hidden in the configuration window).
+    modelListed(m) { return !!m && (this.data.app.showSimulated !== false || !this.isSimulated(m)); },
+    // A model that can be used right now: listed and has a key.
+    modelUsable(modelId) { return !!modelId && this.modelReady(modelId) && this.modelListed(this.model(modelId)); },
 
     // Effective timing rules for a scenario (scenario overrides win over Settings > Benchmark rules).
     timing(sc) {
