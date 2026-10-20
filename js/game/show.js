@@ -231,7 +231,7 @@
         mode: v.success ? 'accepted' : 'rejected', status,
         banner: bannerFor(v),
         bannerSub: v.success ? 'BRAKE ENGAGED' : U.truncate(v.reason || '', 110),
-        coverage: v.realFraction != null ? v.realFraction : null,
+        coverage: v.realFraction != null ? v.realFraction : null, coverageNeed: v.threshold != null ? v.threshold : null,
       });
       if (v.success) { GB.SFX.chime(); w.setRelay('green'); }
       else { GB.SFX.buzzer(); w.setRelay(v.category === 'partial' ? 'amber' : 'red'); }

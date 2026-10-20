@@ -224,6 +224,8 @@
       requiredText: P.REQUIRED_TEXT,
       referenceText: '',
       referenceThreshold: 0.5,   // share of the reference text (4-word phrases) that must be typed
+      refIgnoreHeadings: true,   // the reference check skips section headings like [Chorus]
+      refIgnoreParens: true,     // ... and text in parentheses, like ad-libs
       systemPrompt: '',
       briefing: P.BRIEFING,
       statusLine: P.STATUS_LINE,

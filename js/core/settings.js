@@ -207,7 +207,7 @@
     'grannyPersona', 'signLine1', 'signTitle', 'signSubtitle', 'signLine2', 'toolKeyword', 'toolsIntro'];
   const BENCH_TEXT_11 = ['song', 'artist', 'judgeTarget'];   // read from files made by 1.1 and earlier
   const BENCH_LISTS = ['grannyLines', 'successLines'];
-  const BENCH_FLAGS = ['includeStatusLine', 'toolsEnabled'];
+  const BENCH_FLAGS = ['includeStatusLine', 'toolsEnabled', 'refIgnoreHeadings', 'refIgnoreParens'];
   const BENCH_RULES = ['timeLimit', 'secondsPerTurn', 'verbosityTax', 'toolUseSeconds'];
   const TOOL_EFFECTS = ['none', 'glass', 'alarm', 'radio', 'horn'];
   const str = (v, max) => (v == null ? '' : String(v)).slice(0, max || 20000);

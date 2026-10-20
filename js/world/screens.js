@@ -36,7 +36,7 @@
       this.canvas = document.createElement('canvas');
       this.canvas.width = 512; this.canvas.height = 384;
       this.ctx = this.canvas.getContext('2d');
-      this.state = { mode: 'idle', text: '', status: 'STANDBY', footer: '', coverage: null, banner: '', bannerSub: '' };
+      this.state = { mode: 'idle', text: '', status: 'STANDBY', footer: '', coverage: null, coverageNeed: null, banner: '', bannerSub: '' };
       this.blink = false; this.blinkT = 0; this.dots = 0;
       this.dirty = true;
       this._draw();
@@ -106,7 +106,7 @@
         const bw = 150, bx = W - bw - 12, by = H - 21;
         c.strokeStyle = '#8dffad';
         c.strokeRect(bx, by, bw, 14);
-        c.fillStyle = s.coverage >= 0.5 ? '#5dff8a' : '#ffc53d';
+        c.fillStyle = s.coverage >= (s.coverageNeed != null ? s.coverageNeed : 0.5) ? '#5dff8a' : '#ffc53d';
         c.fillRect(bx + 2, by + 2, (bw - 4) * U.clamp(s.coverage, 0, 1), 10);
         c.fillStyle = '#8dffad';
         c.textAlign = 'right';

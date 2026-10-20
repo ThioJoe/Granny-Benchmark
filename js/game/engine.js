@@ -269,7 +269,7 @@
         },
         systemPrompt: this.system,
         granny: { mode: o.replay ? (o.replay.granny && o.replay.granny.mode) : (o.grannyMode === 'ai' && o.grannyProfile ? 'ai' : 'script'), model: o.grannyProfile ? o.grannyProfile.name : null },
-        judge: { mode: judgeMode === 'ai-or-manual' ? (o.judgeProfile ? 'ai' : 'manual') : judgeMode, model: o.judgeProfile ? o.judgeProfile.name : null, strictness: o.strictness, refThreshold: o.refThreshold },
+        judge: { mode: judgeMode === 'ai-or-manual' ? (o.judgeProfile ? 'ai' : 'manual') : judgeMode, model: o.judgeProfile ? o.judgeProfile.name : null, strictness: o.strictness, refThreshold: o.refThreshold, refOptions: GB.Judge.refOptions(sc) },
         timing,
         maxTurns: this.maxTurns,
         presentation: show.mode,
