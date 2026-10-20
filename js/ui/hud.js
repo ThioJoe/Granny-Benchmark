@@ -259,16 +259,25 @@
         if (!it.visible) continue;
         if (it.done && it.pos) { if (it.pos.docked) dockY = Math.min(dockY, it.pos.y - 8); continue; }
         const bw = it.el.offsetWidth, bh = it.el.offsetHeight;
-        let docked = who === 'narrator';
+        let docked = who === 'narrator', below = false;
         let x = 0, y = 0;
         if (!docked) {
           // The bubble goes above where the head is at rest, as seen from where the camera is headed, so it
           // stays put while the speaker sways and the camera moves or shakes. Its tail follows the head.
-          this.world.project(anchors[who + 'Seat'] || anchors[who], tmp, rest);
+          this.world.project(anchors[who + 'Seat'], tmp, rest);
           docked = tmp.behind || tmp.x < -40 || tmp.x > W + 40 || tmp.y < 30 || tmp.y > H + 20;
           x = U.clamp(tmp.x - bw / 2, 8, W - bw - 8);
-          y = U.clamp(tmp.y - bh - 14, 64, H - bh - 8);
-          if (x < hudR && x + bw > hudL) y = Math.min(Math.max(y, hudB), H - bh - 8);
+          const top = x < hudR && x + bw > hudL ? hudB : 64;   // it may not go higher (or cover the HUD)
+          y = tmp.y - bh - 14;
+          // No room above the head: it goes below the chin, with its tail pointing up. (Once below, it needs
+          // clearly more room to go back above, so it does not flip between the two.)
+          if (y < top + (it.pos && it.pos.below && !it.snap ? 20 : 0)) {
+            this.world.project(anchors[who + 'SeatChin'], tmp, rest);
+            below = true;
+            y = tmp.y + 14;
+            if (y + bh > H - 8) { docked = true; below = false; }   // no room below either
+          }
+          y = U.clamp(y, top, H - bh - 8);
         }
         if (docked) {
           x = U.clamp((W - bw) / 2, inset, Math.max(inset, W - bw - insetR));
@@ -278,18 +287,19 @@
         // When that place changes (another shot cued during the line, the camera turned by hand, the other
         // docked bubble), the bubble glides there. A new line, a big jump, or a switch to or from docked jumps.
         const p = it.pos, d = p ? Math.hypot(x - p.x, y - p.y) : 0;
-        if (!p || it.snap || p.docked !== docked || d > 260) it.pos = { x, y, docked };
+        if (!p || it.snap || p.docked !== docked || p.below !== below || d > 260) it.pos = { x, y, docked, below };
         else if (d > 3) { const a = 1 - Math.exp(-dt * 6); p.x += (x - p.x) * a; p.y += (y - p.y) * a; }
         it.snap = false;
         x = it.pos.x; y = it.pos.y;
         if (!docked) {
           if (x < hudR && x + bw > hudL) y = Math.min(Math.max(y, hudB), H - bh - 8);
-          this.world.project(anchors[who], head);
+          this.world.project(anchors[below ? who + 'Chin' : who], head);
           it.el.style.setProperty('--tail', U.clamp(head.x - x, 18, bw - 18) + 'px');
         }
         const maxW = docked ? Math.max(240, Math.min(720, W - inset - insetR - 4)) + 'px' : '';
         if (it.el.style.maxWidth !== maxW) it.el.style.maxWidth = maxW;
         it.el.classList.toggle('docked', docked);
+        it.el.classList.toggle('below', below);
         it.el.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
       }
     },

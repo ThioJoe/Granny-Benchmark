@@ -304,6 +304,10 @@ body.panel-resizing #view { pointer-events: none; }
 .bubble.robot::after { border-top-color: #e9fdff; }
 .bubble.narrator, .bubble.docked { background: rgba(10, 12, 18, 0.86); color: #f3f5f9; max-width: min(720px, 90%); text-align: center; }
 .bubble.docked::after, .bubble.narrator::after { display: none; }
+/* Below the speaker's head (no room above it): the tail points up. */
+.bubble.below::after { top: -9px; bottom: auto; border-top: 0; border-bottom: 10px solid transparent; }
+.bubble.granny.below::after { border-bottom-color: #fff1f3; }
+.bubble.robot.below::after { border-bottom-color: #e9fdff; }
 .bubble.long { max-width: min(460px, 75vw); }
 .bubble-name { font-size: 10.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.55; margin-bottom: 2px; }
 .bubble-text span.said { opacity: 1; }

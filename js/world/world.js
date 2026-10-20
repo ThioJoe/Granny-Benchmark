@@ -262,15 +262,19 @@
     setRobotLook(where) { this.robotLook = where; }
     grannyLookAtTrain(seconds) { this.lookTrainUntil = this.t + (seconds || 1.6); }
 
-    // Points just above the heads, for the speech bubbles. grannySeat and robotSeat are those points with the
-    // head at rest (Grandma sways in her chair, the robot tilts its head), so a bubble can stay put while its
-    // tail follows the head.
+    // Points just above the heads and just below the chins, for the speech bubbles. The ...Seat points are
+    // those with the head at rest (Grandma sways in her chair, the robot tilts its head), so a bubble can stay
+    // put while its tail follows the head.
     anchors() {
-      const g = this.granny.head.localToWorld([0, 0.48, 0]);
-      const r = this.robot.head.localToWorld([0, 0.62, 0]);
-      const rig = this.granny.rig, up = this.granny.torso.position[1] + this.granny.head.position[1] + 0.48;
-      const seat = this.grannyFree ? rig.localToWorld([0, up, 0]) : [rig.position[0], 0.18 + up, rig.position[2]];
-      return { granny: g, robot: r, grannySeat: seat, robotSeat: this.robot.body.localToWorld([0, this.robot.head.position[1] + 0.62, 0]) };
+      const g = this.granny, r = this.robot;
+      const neck = g.torso.position[1] + g.head.position[1], rNeck = r.head.position[1];
+      const seat = (y) => (this.grannyFree ? g.rig.localToWorld([0, neck + y, 0]) : [g.rig.position[0], 0.18 + neck + y, g.rig.position[2]]);
+      return {
+        granny: g.head.localToWorld([0, 0.48, 0]), grannyChin: g.head.localToWorld([0, -0.02, 0]),
+        grannySeat: seat(0.48), grannySeatChin: seat(-0.02),
+        robot: r.head.localToWorld([0, 0.62, 0]), robotChin: r.head.localToWorld([0, -0.02, 0]),
+        robotSeat: r.body.localToWorld([0, rNeck + 0.62, 0]), robotSeatChin: r.body.localToWorld([0, rNeck - 0.02, 0]),
+      };
     }
     trainFront() { return [0, 1.6, this.train.root.position[2]]; }
     grannyWorld() { return this.granny.rig.worldPosition(); }
