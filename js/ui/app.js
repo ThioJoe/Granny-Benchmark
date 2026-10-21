@@ -551,6 +551,7 @@
       }
       U.$('#fr-bubbles').addEventListener('change', (e) => document.body.classList.toggle('framing-no-bubbles', !e.target.checked));
       U.$('#fr-hud').addEventListener('change', (e) => document.body.classList.toggle('framing-no-hud', !e.target.checked));
+      U.$('#fr-sign').addEventListener('change', (e) => { if (this.world) this.world.signRig.visible = e.target.checked; });
       U.$('#fr-done').addEventListener('click', () => { S.data.graphics.framing = false; S.save(); this.applyFraming(); });
     },
 
@@ -568,7 +569,7 @@
     },
 
     // On: the controls start from where the train and the head are now (reveal: also open the panel they are
-    // in). Off: the show takes them back, and the speech bubbles, header and HUD come back.
+    // in). Off: the show takes them back, and the speech bubbles, header, HUD and sign come back.
     applyFraming(reveal) {
       const w = this.world;
       const on = !!S.data.graphics.framing && !!w;
@@ -579,9 +580,10 @@
         if (w.frameHeadYaw == null) this._frameHead(w.robot.head.rotation[1]);
         if (reveal && document.body.classList.contains('panel-closed')) U.$('#panel-toggle').click();
       } else {
-        if (w) { w.frameTrain = null; w.frameHeadYaw = null; }
+        if (w) { w.frameTrain = null; w.frameHeadYaw = null; w.signRig.visible = true; }
         U.$('#fr-bubbles').checked = true;
         U.$('#fr-hud').checked = true;
+        U.$('#fr-sign').checked = true;
         document.body.classList.remove('framing-no-bubbles', 'framing-no-hud');
       }
     },

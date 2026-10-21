@@ -445,7 +445,7 @@
         g.vertical ? F.check(g, 'safeGuide', 'Show the covered areas', { onChange: () => GB.App.applyFrame(),
           hint: 'Red and orange: covered by TikTok and Instagram. Yellow: partly covered. For checking only; turn it off before recording.' }) : null,
         F.check(g, 'framing', 'Framing mode', { onChange: () => GB.App.applyFraming(true),
-          hint: 'For setting up shots. Adds controls at the top of the Arena panel: how close the train is, which way the AI\'s head is turned, and whether the speech bubbles and the header and HUD are shown. Works during a paused run too.' }),
+          hint: 'For setting up shots. Adds controls at the top of the Arena panel: how close the train is, which way the AI\'s head is turned, and whether the speech bubbles, the header and HUD, and the sign are shown. Works during a paused run too.' }),
         F.check(c, 'autoDirector', 'Start with the automatic camera'),
         F.check(c, 'invertY', 'Invert vertical mouse look', { onChange: applyCam }),
         F.field('Mouse sensitivity', F.range(c, 'sensitivity', { min: 0.2, max: 3, step: 0.1, fmt: (x) => x.toFixed(1) + 'x', onChange: applyCam }))));
