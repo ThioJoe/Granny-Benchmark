@@ -550,5 +550,26 @@
     return n;
   };
 
+  // ---------------------------------------------------------------------------
+  // Bowling ending: a big bowling pin (base at the origin, PIN_H tall) and the deck the rack stands on.
+  // ---------------------------------------------------------------------------
+  M.PIN_H = 1.3;
+  M.pin = function (R) {
+    const k = M.PIN_H / 15;   // profile of a real pin, in inches (15 in tall)
+    const prof = [[0, 1.0], [1.5, 1.7], [3, 2.2], [4.5, 2.38], [6, 2.2], [7.5, 1.65], [8.8, 1.1], [9.3, 0.98], [9.8, 0.92],
+      [10.3, 0.95], [11.2, 1.08], [12.5, 1.25], [13.6, 1.18], [14.4, 0.85], [15, 0.25]];
+    const red = (y) => (y >= 8.8 && y < 9.3) || (y >= 9.8 && y < 10.3);
+    const parts = [];
+    for (let i = 0; i < prof.length - 1; i++) {
+      const [y0, r0] = prof[i], [y1, r1] = prof[i + 1];
+      parts.push(P(G.cylinder(r1 * k, r0 * k, (y1 - y0) * k, 12, red(y0) ? '#c8202e' : '#f3efe6'), [0, ((y0 + y1) / 2) * k, 0]));
+    }
+    return mesh(R, G.merge(parts), 'pin');
+  };
+
+  M.pinDeck = function (R) {
+    return mesh(R, G.merge([P(G.box(3.9, 0.06, 4.6, '#d8b27a'), [0, 0, 0]), P(G.box(3.9, 0.012, 0.05, '#b58b55'), [0, 0.035, 2.0])]), 'pinDeck');
+  };
+
   GB.Models = M;
 })(window.GB = window.GB || {});

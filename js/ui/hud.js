@@ -96,12 +96,24 @@
         this.el.verdict.className = 'verdict-chip ' + info.cls;
         this.el.verdict.textContent = info.icon + ' ' + (p.verdict.success && p.verdict.category !== 'tool' ? P.VERDICTS.match.label : info.label);
       }
-      if (p.altitude !== undefined) this.el.altitude.classList.toggle('hidden', !p.altitude);
+      // One readout under the clock: Grandma's altitude (orbit ending) or the pins she knocked down (bowling ending).
+      if (p.altitude !== undefined || p.pins !== undefined) {
+        this.counter = p.pins ? 'pins' : p.altitude ? 'altitude' : null;
+        this.el.altitude.classList.toggle('hidden', !this.counter);
+        this.el.altitude.classList.remove('strike');
+      }
     },
 
     frame(dt, fps) {
-      if (!this.el.altitude.classList.contains('hidden') && this.world) {
-        this.el.altitude.textContent = 'GRANDMA ALTITUDE: ' + Math.max(0, Math.round(this.world.grannyAltitude)).toLocaleString() + ' m';
+      if (this.counter && this.world) {
+        const w = this.world, el = this.el.altitude;
+        if (this.counter === 'pins') {
+          const strike = w.pinsDown >= w.pins.length;
+          el.textContent = strike ? 'STRIKE!' : 'PINS DOWN: ' + w.pinsDown;
+          el.classList.toggle('strike', strike);
+        } else {
+          el.textContent = 'GRANDMA ALTITUDE: ' + Math.max(0, Math.round(w.grannyAltitude)).toLocaleString() + ' m';
+        }
       }
       if (this.el.fps) {
         const show = GB.Settings.data.graphics.showFps;

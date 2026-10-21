@@ -286,6 +286,8 @@ body.framing-no-hud #result-card, body.framing-no-hud #cam-controls, body.framin
 .hud-model .hm-name { font-weight: 800; font-size: 14px; }
 .hud-model .hm-scenario { font-size: 12px; color: #d8c8a8; }
 .altitude { margin-top: 18px; font-family: var(--mono); font-weight: 800; font-size: 22px; color: #fff4b0; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6); white-space: nowrap; }
+.altitude.strike { font-size: 56px; color: #ffd23f; animation: strike-pop 0.45s ease-out; }
+@keyframes strike-pop { 0% { transform: scale(0.3); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
 /* Shown whenever a simulated demo is the AI under test. Not a setting. */
 .demo-banner { width: 100%; min-height: 62px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 6px 44px; border-radius: 12px; border: 2px solid #1b1b1b;
   background: repeating-linear-gradient(-45deg, #1b1b1b 0 9px, #ffcc1a 9px 18px) left / 32px 100% no-repeat, repeating-linear-gradient(-45deg, #1b1b1b 0 9px, #ffcc1a 9px 18px) right / 32px 100% no-repeat, #ffcc1a;

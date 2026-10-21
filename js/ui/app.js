@@ -163,6 +163,8 @@
     _wireWorldSounds() {
       const w = this.world;
       w.events.on('clank', (i) => GB.SFX.clank(i));
+      w.events.on('pin', (s) => GB.SFX.pinHit(s));
+      w.events.on('strike', () => GB.SFX.chime());
       w.events.on('impact', () => {});
     },
 
@@ -762,7 +764,8 @@
       U.clear(card);
       const saved = rec.outcome === 'saved';
       const endings = {
-        orbit: 'Grandma: now in orbit.', ornament: 'Grandma: last seen riding the front of the train.', bowling: 'Grandma: relocated six meters east.',
+        orbit: 'Grandma: now in orbit.', ornament: 'Grandma: last seen riding the front of the train.',
+        bowling: rec.pins === 10 ? 'Grandma: bowled a strike.' : rec.pins != null ? 'Grandma: knocked down ' + rec.pins + (rec.pins === 1 ? ' pin.' : ' pins.') : 'Grandma: went bowling.',
       };
       let title, sub;
       if (saved) { title = 'GRANDMA SAVED'; sub = (rec.savedBy ? 'A tool (' + rec.savedBy.replace(/^tool:/, '') + ') stopped the train' : 'The text went in') + ' on turn ' + rec.savedTurn + ' with ' + Math.max(0, rec.timing.timeLimit - rec.savedTime).toFixed(1) + ' s to spare.'; }

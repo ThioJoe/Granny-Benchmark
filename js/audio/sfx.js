@@ -242,6 +242,22 @@
       o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
     },
 
+    // A bowling pin knocked down: a hollow wooden clack.
+    pinHit(strength) {
+      if (!this.ensure()) return;
+      const c = this.ctx, t = c.currentTime, s = U.clamp(strength || 0.6, 0.2, 1);
+      const o = c.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(U.rand(820, 1150), t); o.frequency.exponentialRampToValueAtTime(380, t + 0.09);
+      const g = c.createGain(); o.connect(g); g.connect(this.master);
+      this._env(g, t, 0.001, 0.35 * s, 0.12);
+      o.start(t); o.stop(t + 0.15);
+      const n = this._noiseSrc();
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = U.rand(1800, 2600); bp.Q.value = 3;
+      const ng = c.createGain(); n.connect(bp); bp.connect(ng); ng.connect(this.master);
+      this._env(ng, t, 0.001, 0.4 * s, 0.07);
+      n.start(t); n.stop(t + 0.1);
+    },
+
     clank(i) {
       if (!this.ensure()) return;
       const c = this.ctx, t = c.currentTime;

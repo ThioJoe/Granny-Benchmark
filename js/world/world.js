@@ -15,6 +15,16 @@
   const PANEL_YAW = -1.03;          // faces back toward the track and the default cameras
   // Grandma's head turn when she talks: most of the way to the robot (at x from the track).
   const grannyTalkYaw = (x) => Math.atan2(x, ROBOT_POS[2]) - GRANNY_YAW + 0.35;
+  // Bowling ending: a rack of 10 pins on a deck on the track, far ahead of the train (behind the usual cameras).
+  const PIN_Z = -46;                // head pin
+  const PIN_GAP = 1.0;              // between pin centers in a row
+  const PIN_ROW = 0.866;            // between rows
+  const PIN_R = 0.2;                // pin radius at its widest
+  const PIN_CM = 0.546;             // a pin's center of mass above its base
+  const DECK_TOP = 0.38;
+  const LANE_HALF = 1.5 * PIN_GAP + PIN_R;   // the invisible walls leading to the rack: as wide as the rack
+  const BALL_R = 0.5;               // Grandma and her chair, as a bowling ball
+  const BALL_C = 0.62;              // ...whose middle is this far above the rig origin
 
   // ---------------------------------------------------------------------------
   class Pool {
@@ -88,6 +98,9 @@
       this.cheer = 0;
       this.alarmUntil = 0;
       this.panelBroken = false;
+      this.pinZ = PIN_Z;
+      this.pinsDown = 0;
+      this.bowl = null;             // the bowling ending while it plays
     }
 
     init(canvas, opts) {
@@ -208,6 +221,21 @@
         return n;
       });
 
+      // the pins for the bowling ending and the deck they stand on (hidden until that ending is coming)
+      this.pinDeck = M.pinDeck(R);
+      this.pinDeck.visible = false;
+      scene.add(this.pinDeck);
+      const pinMesh = M.pin(R).mesh;
+      this.pins = [];
+      for (let row = 0; row < 4; row++) {
+        for (let i = 0; i <= row; i++) {
+          const node = new Node('pin', pinMesh);
+          node.visible = false;
+          scene.add(node);
+          this.pins.push({ node, home: [(i - row / 2) * PIN_GAP, PIN_Z - row * PIN_ROW] });
+        }
+      }
+
       this.camera = new GB.CameraController(canvas, this);
       this.ready = true;
       this.reset();
@@ -315,6 +343,10 @@
       this.train.root.position[2] = TRAIN_PARK;
       this.trainSpeed = 0;
       for (const c of this.pathClouds) c.visible = false;
+      this.bowl = null;
+      this.pinsDown = 0;
+      this.pinDeck.visible = false;
+      for (const p of this.pins) p.node.visible = false;
       this.smoke.clear(); this.sparks.clear(); this.shards.clear(); for (const p of this.confetti) p.clear();
       this.panelBroken = false;
       this.panel.glass.visible = true;
@@ -428,7 +460,7 @@
       }
     }
 
-    // kind: 'orbit' | 'ornament' | 'bowling'. Resolves once the gag has played out.
+    // kind: 'orbit' | 'ornament' | 'bowling' (set up the pins with setupPins first). Resolves once the gag has played out.
     async failEnding(kind) {
       this.events.emit('impact', kind);
       this.grannyFree = true;
@@ -449,31 +481,20 @@
       }
 
       if (kind === 'bowling') {
-        const p0 = rig.position.slice();
-        const p1 = [this.station + 1.7, 0.0, -1.6];
-        const segs = [0.36, 0.26, 0.2, 0.14, 0.1];
-        const heights = [3.2, 1.7, 0.9, 0.4, 0.12];
-        const total = segs.reduce((a, b) => a + b, 0);
-        const yaw1 = Math.atan2(this.station + 5.2 - p1[0], -2.5 - p1[2]);
-        runTrainAway();
-        await this.animate(2.4, (u) => {
-          let acc = 0, y = 0;
-          const tt = u * total;
-          for (let i = 0; i < segs.length; i++) {
-            if (tt <= acc + segs[i] || i === segs.length - 1) { const k = U.clamp((tt - acc) / segs[i], 0, 1); y = heights[i] * 4 * k * (1 - k); break; }
-            acc += segs[i];
-          }
-          const h = U.ease.out(u);
-          rig.position[0] = U.lerp(p0[0], p1[0], h);
-          rig.position[2] = U.lerp(p0[2], p1[2], h);
-          rig.position[1] = U.lerp(p0[1], p1[1], u) + y;
-          const spin = (1 - U.ease.out(u)) * 4 * PI;
-          rig.rotation[0] = spin;
-          rig.rotation[1] = U.lerp(GRANNY_YAW, yaw1 + 4 * PI, h);
-          rig.rotation[2] = Math.sin(u * 20) * (1 - u) * 0.6;
+        // The train brakes to a stop well short of the pins, and Grandma goes on down the track as the ball.
+        const from = this.trainDist, stop = -12;
+        this.braking = true;
+        this.animate(U.clamp((2 * (from - stop)) / Math.max(8, this.trainSpeed), 0.8, 2.6), (u) => { this.trainDist = U.lerp(from, stop, u); }, U.ease.out)
+          .then(() => { this.braking = false; this.trainRunning = false; this.trainSpeed = 0; });
+        if (!this.pinDeck.visible) this.setupPins();
+        await new Promise((resolve) => {
+          this.bowl = {
+            c: [rig.position[0], rig.position[1] + BALL_C, rig.position[2]],
+            v: [U.rand(-1.6, 1.6), U.rand(7, 8.5), -U.rand(22, 25)],
+            w: [-U.rand(9, 12), U.rand(-4, 4), U.rand(-5, 5)],
+            t: 0, firstHit: 0, still: 0, hold: 0, done: false, near: false, resolve,
+          };
         });
-        rig.rot(0, yaw1, 0);
-        await this.wait(2.2);
         return;
       }
 
@@ -488,6 +509,168 @@
         rig.rotation[0] += spin[0] * dt; rig.rotation[1] += spin[1] * dt; rig.rotation[2] += spin[2] * dt;
         this.grannyAltitude = rig.position[1];
       });
+    }
+
+    // Bowling ending: stand the rack up on its deck far down the track, out of sight of the usual cameras.
+    setupPins() {
+      if (!this.ready) return;
+      this.pinDeck.at(0, DECK_TOP - 0.03, PIN_Z - 1.3);
+      this.pinDeck.visible = true;
+      for (const p of this.pins) {
+        p.c = [p.home[0], DECK_TOP + PIN_CM, p.home[1]];
+        p.v = [0, 0, 0];
+        p.yaw = 0; p.pitch = 0; p.wp = 0; p.wy = 0;
+        p.down = false; p.rest = true;
+        this._placePin(p);
+        p.node.visible = true;
+      }
+      this.pinsDown = 0;
+    }
+
+    // A pin's node from its center of mass and its tilt (pitch, toward yaw). Returns its axis.
+    _placePin(p) {
+      const s = Math.sin(p.pitch);
+      const a = [s * Math.sin(p.yaw), Math.cos(p.pitch), s * Math.cos(p.yaw)];
+      p.node.at(p.c[0] - a[0] * PIN_CM, p.c[1] - a[1] * PIN_CM, p.c[2] - a[2] * PIN_CM).rot(p.pitch, p.yaw, 0);
+      return a;
+    }
+
+    // Ground height for the bowling ending: the pin deck, the track, or the field beside it.
+    _ground(x, z) {
+      if (Math.abs(x) < 1.95 && z < PIN_Z + 1.0 && z > PIN_Z - 3.6) return DECK_TOP;
+      return Math.abs(x) < 1.45 ? 0.18 : -0.03;
+    }
+
+    _knockPin(p, dir, speed, up) {
+      p.down = true; p.rest = false;
+      p.yaw = Math.atan2(dir[0], dir[2]);
+      p.v = [dir[0] * speed, up, dir[2] * speed];
+      p.wp = U.rand(5, 9) + speed * 0.5;
+      p.wy = U.rand(-3, 3);
+      this.pinsDown++;
+      this.events.emit('pin', U.clamp(speed / 10, 0.3, 1));
+      if (this.pinsDown === this.pins.length) this.events.emit('strike');
+    }
+
+    _updateBowl(dt) {
+      const b = this.bowl;
+      if (dt <= 0) return;
+      const n = Math.ceil(dt / (1 / 240)), h = dt / n;
+      for (let i = 0; i < n; i++) this._bowlStep(b, h);
+      // Grandma tumbles around her middle (the rig's origin is at the chair's feet)
+      const rig = this.granny.rig, r = rig.rotation;
+      const sx = Math.sin(r[0]), cx = Math.cos(r[0]), sy = Math.sin(r[1]), cy = Math.cos(r[1]), sz = Math.sin(r[2]), cz = Math.cos(r[2]);
+      const up = [sy * sx * cz - cy * sz, cx * cz, cy * sx * cz + sy * sz];   // the rig's local +Y in the world
+      rig.at(b.c[0] - up[0] * BALL_C, b.c[1] - up[1] * BALL_C, b.c[2] - up[2] * BALL_C);
+      for (const p of this.pins) if (p.down) this._placePin(p);
+      // she is close to the pins (the show cuts to them)
+      if (!b.near && b.c[2] < PIN_Z + 11) { b.near = true; this.events.emit('bowl', 'near'); }
+      // done once Grandma and the pins have stopped (or time is up), then a moment to read the count
+      if (!b.done) {
+        const moving = this.pins.some((p) => p.down && !p.rest);
+        b.still = b.firstHit && !moving && Math.hypot(b.v[0], b.v[1], b.v[2]) < 0.3 ? b.still + dt : 0;
+        if (b.still > 0.2 || (b.firstHit && b.t - b.firstHit > 4.5) || b.t > 12) { b.done = true; b.hold = 2; this.events.emit('bowl', 'settled'); }
+      } else if (b.hold > 0) {
+        b.hold -= dt;
+        if (b.hold <= 0) b.resolve();
+      }
+    }
+
+    _bowlStep(b, h) {
+      const c = b.c, v = b.v, rig = this.granny.rig;
+      b.t += h;
+      const lane = c[2] > PIN_Z + 0.4;   // still between the invisible walls, short of the head pin
+      // Gravity, plus an extra pull down close to the pins so she can't hop over them.
+      let floor = this._ground(c[0], c[2]) + BALL_R * 0.8;
+      v[1] -= (lane && c[2] < PIN_Z + 8 && c[1] > floor + 0.25 ? 48 : 20) * h;
+      c[0] += v[0] * h; c[1] += v[1] * h; c[2] += v[2] * h;
+      // the walls: as wide as the rack, up to the head pin
+      const lim = LANE_HALF - BALL_R;
+      if (lane && Math.abs(c[0]) > lim) { c[0] = Math.sign(c[0]) * lim; v[0] = -v[0] * 0.6; b.w[1] += U.rand(-3, 3); }
+      floor = this._ground(c[0], c[2]) + BALL_R * 0.8;
+      if (c[1] <= floor) {
+        c[1] = floor;
+        if (v[1] < -2.5) {
+          // bounce, with a new tumble each time
+          v[1] = -v[1] * 0.42;
+          v[0] = v[0] * 0.8 + U.rand(-1.2, 1.2);
+          v[2] *= 0.9;
+          b.w = [-U.rand(6, 12), U.rand(-5, 5), U.rand(-6, 6)];
+        } else {
+          // rolling: friction slows her (much more once she is in the pins)
+          v[1] = 0;
+          const sp = Math.hypot(v[0], v[2]), k = Math.max(0, sp - (b.firstHit ? 14 : 1.6) * h) / (sp || 1);
+          v[0] *= k; v[2] *= k;
+          b.w[0] = (v[2] / BALL_R) * 0.8;
+          b.w[1] *= 1 - 3 * h; b.w[2] *= 1 - 3 * h;
+        }
+      }
+      if (lane && v[2] > -8) v[2] = -8;   // she always reaches the pins
+      rig.rotation[0] += b.w[0] * h; rig.rotation[1] += b.w[1] * h; rig.rotation[2] += b.w[2] * h;
+
+      // Grandma against the pins
+      const sp = Math.hypot(v[0], v[2]);
+      for (const p of this.pins) {
+        const dx = p.c[0] - c[0], dz = p.c[2] - c[2], d = Math.hypot(dx, dz);
+        if (d > BALL_R + PIN_R || Math.abs(p.c[1] - c[1]) > 0.95) continue;
+        const away = d > 1e-4 ? [dx / d, 0, dz / d] : [0, 0, -1];
+        if (!p.down) {
+          const mx = away[0] + (v[0] / (sp || 1)) * 0.8, mz = away[2] + (v[2] / (sp || 1)) * 0.8, ml = Math.hypot(mx, mz) || 1;
+          this._knockPin(p, [mx / ml, 0, mz / ml], U.clamp(sp * U.rand(0.35, 0.55), 3, 8), U.rand(2, 4.5));
+          if (!b.firstHit) b.firstHit = b.t;
+          v[0] = v[0] * 0.85 - away[0] * 0.8; v[2] *= 0.85;
+        } else if (sp > 2) {
+          // pins already down get pushed out of her way
+          const along = p.v[0] * away[0] + p.v[2] * away[2], want = Math.min(4, sp * 0.4);
+          if (along < want) { p.v[0] += away[0] * (want - along); p.v[2] += away[2] * (want - along); p.rest = false; }
+        }
+      }
+      // She passed the back row without touching a pin (the walls should make that impossible): knock the nearest.
+      if (!b.firstHit && c[2] < PIN_Z - 3 * PIN_ROW - 0.2) {
+        let best = null, bd = Infinity;
+        for (const p of this.pins) { const d = Math.hypot(p.c[0] - c[0], p.c[2] - c[2]); if (d < bd) { bd = d; best = p; } }
+        this._knockPin(best, [0, 0, -1], Math.max(3, sp * 0.7), 2);
+        b.firstHit = b.t;
+      }
+
+      // the pins: fly, tip over until they lie flat, and knock down the pins they fall against
+      for (const p of this.pins) {
+        if (!p.down || p.rest) continue;
+        p.v[1] -= 14 * h;
+        p.c[0] += p.v[0] * h; p.c[1] += p.v[1] * h; p.c[2] += p.v[2] * h;
+        p.pitch += p.wp * h; p.yaw += p.wy * h;
+        const ay = Math.cos(p.pitch), s = Math.abs(Math.sin(p.pitch));
+        const low = p.c[1] + Math.min(-PIN_CM * ay - 0.09 * s, (0.39 - PIN_CM) * ay - PIN_R * s, (M.PIN_H - PIN_CM) * ay - 0.07 * s);
+        const g = this._ground(p.c[0], p.c[2]);
+        if (low < g) {
+          p.c[1] += g - low;
+          if (p.v[1] < 0) p.v[1] *= -0.3;
+          const f = Math.max(0, 1 - 4 * h);
+          p.v[0] *= f; p.v[2] *= f; p.wy *= f;
+          // gravity tips it over until it lies flat
+          const flat = PI / 2 + Math.round((p.pitch - PI / 2) / PI) * PI, dp = flat - p.pitch;
+          if (Math.abs(dp) < 0.05 && Math.abs(p.wp) < 1.5) { p.pitch = flat; p.wp = 0; }
+          else p.wp = p.wp * Math.max(0, 1 - 3 * h) + Math.sign(dp) * 30 * h;
+          if (p.wp === 0 && Math.hypot(p.v[0], p.v[1], p.v[2]) < 0.15 && Math.abs(p.wy) < 0.2) p.rest = true;
+        }
+        // its axis (base to head) against the pins still standing
+        const sn = Math.sin(p.pitch), a = [sn * Math.sin(p.yaw), Math.cos(p.pitch), sn * Math.cos(p.yaw)];
+        const bx = p.c[0] - a[0] * PIN_CM, by = p.c[1] - a[1] * PIN_CM, bz = p.c[2] - a[2] * PIN_CM;
+        const ex = a[0] * M.PIN_H, ey = a[1] * M.PIN_H, ez = a[2] * M.PIN_H;
+        const tip = Math.hypot(p.v[0], p.v[2]) + Math.abs(p.wp) * 0.8;
+        for (const q of this.pins) {
+          if (q.down) continue;
+          const len2 = ex * ex + ez * ez;
+          const t = len2 > 1e-6 ? U.clamp(((q.c[0] - bx) * ex + (q.c[2] - bz) * ez) / len2, 0, 1) : 0;
+          const px = bx + ex * t, py = by + ey * t, pz = bz + ez * t;
+          const dx = q.c[0] - px, dz = q.c[2] - pz, d = Math.hypot(dx, dz);
+          if (d > PIN_R * 1.8 || py > DECK_TOP + M.PIN_H || tip < 1) continue;
+          const vl = Math.hypot(p.v[0], p.v[2]) || 1;
+          const mx = dx / (d || 1) + (p.v[0] / vl) * 0.6, mz = dz / (d || 1) + (p.v[2] / vl) * 0.6, ml = Math.hypot(mx, mz) || 1;
+          this._knockPin(q, [mx / ml, 0, mz / ml], U.clamp(tip * U.rand(0.3, 0.5), 1.2, 4.5), U.rand(0.3, 1.5));
+          p.v[0] *= 0.7; p.v[2] *= 0.7;
+        }
+      }
     }
 
     // ---------------------------------------------------------------------------
@@ -517,6 +700,7 @@
 
       this._updateTrain(dt, sdt);
       this._updateGranny(dt, sdt);
+      if (this.bowl) this._updateBowl(dt);
       this._updateRobot(dt);
       this.smoke.update(sdt);
       this.sparks.update(sdt);

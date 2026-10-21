@@ -27,8 +27,10 @@
       const rise = Math.max(0, p[1] - 2);
       return { pos: [p[0] - 6.5 + Math.min(rise, 4), Math.max(1.4, p[1] - 2.2), p[2] - 8.5 + Math.min(rise, 3)], target: [p[0], p[1] + 0.5, p[2]], fov: 0.9 };
     },
-    bowlingLane: (w) => { const s = w.station - 3.3; return { pos: [10.5 + s, 3.2, -6.5], target: [2.6 + 0.8 * s, 0.9, 0.4] }; },
-    bowlingLanding: (w) => { const x = w.station; return { pos: [x + 5.2, 1.7, -2.5], target: [x + 0.7, 0.95, -0.4], fov: 0.85 }; },
+    // Bowling ending: beside Grandma as she goes down the track, then at the pins looking back up the lane.
+    bowlingSide: (w) => { const z = w.bowl ? w.bowl.c[2] : 0; return { pos: [-6.2, 1.8, z + 2.6], target: [0, 0.9, z - 2.4], fov: 0.9 }; },
+    pinCam: (w) => ({ pos: [-3.0, 1.7, w.pinZ - 10.5], target: [0.6, 0.45, w.pinZ + 2], fov: 0.8 }),
+    pinsAfter: (w) => ({ pos: [-10, 8, w.pinZ - 4.5], target: [0.5, 0, w.pinZ - 4.5], fov: 0.95 }),
     idleOrbit: (w) => {
       const a = w.t * 0.045 + 3.9;
       return { pos: [2.5 + Math.cos(a) * 16, 8.6 + Math.sin(w.t * 0.07) * 1.2, 3 + Math.sin(a) * 16], target: [2.6, 1.0, 3.5] };
@@ -119,8 +121,9 @@
         case 'final': this.goTo('track', 0.7); break;
         case 'impact-orbit': this.goTo('followGranny', 0); break;
         case 'impact-ornament': this.goTo('trainChase', 0); break;
-        case 'impact-bowling': this.goTo('bowlingLane', 0.25); break;
-        case 'landing': this.goTo('bowlingLanding', 0.8); break;
+        case 'impact-bowling': this.goTo('bowlingSide', 0); break;
+        case 'pins': this.goTo('pinCam', 0); break;
+        case 'pins-after': this.goTo('pinsAfter', 1.1); break;
         case 'aftermath': this.goTo('robotFront', 1.4); break;
         case 'tool':
           if (ctx.effect === 'glass') this.goTo('panel', 0.7);

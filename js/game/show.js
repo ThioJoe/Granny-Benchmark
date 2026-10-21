@@ -460,6 +460,7 @@
       w.camera.cue('final');
       GB.SFX.horn(1, 1.6);
       w.grannyLookAtTrain(3);
+      if (kind === 'bowling') w.setupPins();   // far down the track, behind the camera
       // A reply cut off by the train has already used up the clock, so the train arrives sooner.
       const approach = this.fast ? 0.6 : o.cutoff ? 1.0 : 1.6;
       w.animate(approach, () => GB.HUD.set({ distance: w.trainDist }));   // the distance readout follows it in
@@ -472,17 +473,20 @@
       w.camera.cue('impact-' + kind);
       const endP = w.failEnding(kind);
       if (kind === 'orbit') { GB.SFX.slideWhistle(2.4); GB.HUD.set({ altitude: true }); }
+      let off = null;
       if (kind === 'bowling') {
-        await this._wait(2.5);
-        if (this.aborted) return;
-        w.camera.cue('landing');
-        w.setRobotLook('camera');
+        GB.SFX.brakes(1.6);
+        GB.HUD.set({ pins: true });
+        // the camera cuts to the pins as she gets close, and rises over them once everything has stopped
+        off = w.events.on('bowl', (stage) => { if (!this.aborted) w.camera.cue(stage === 'near' ? 'pins' : 'pins-after'); });
       }
       await this._race(endP);
+      if (off) off();
       if (this.aborted) return;
-      GB.HUD.set({ altitude: false });
+      if (kind === 'bowling') rec.pins = w.pinsDown;
+      GB.HUD.set({ altitude: false, pins: false });
       w.setRobotLook('camera');
-      if (kind !== 'bowling') w.camera.cue('aftermath');
+      w.camera.cue('aftermath');
       await this._wait(this.fast ? 0.6 : 2.2);
     }
 
