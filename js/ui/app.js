@@ -565,7 +565,7 @@
       }
       U.$('#fr-sign').addEventListener('change', (e) => { if (this.world) this.world.signRig.visible = e.target.checked; });
       U.$('#fr-poles').addEventListener('change', (e) => { if (this.world) this.world.poles.visible = e.target.checked; });
-      U.$('#fr-foliage').addEventListener('change', (e) => { if (this.world) this.world.foliage.visible = !e.target.checked; });
+      U.$('#fr-foliage').addEventListener('change', (e) => { if (this.world) this.world.foliage.visible = e.target.checked; });
       U.$('#fr-panel').addEventListener('change', (e) => { if (this.world) this.world.frameHidePanel = !e.target.checked; });
       U.$('#fr-done').addEventListener('click', () => { S.data.graphics.framing = false; S.save(); this.applyFraming(); });
     },
@@ -604,8 +604,7 @@
         if (reveal && document.body.classList.contains('panel-closed')) U.$('#panel-toggle').click();
       } else {
         if (w) { w.frameTrain = null; w.frameHeadYaw = null; w.signRig.visible = true; w.poles.visible = true; w.foliage.visible = true; w.frameHidePanel = false; }
-        for (const id of ['#fr-bubbles', '#fr-bubble-text', '#fr-hud', '#fr-sign', '#fr-poles', '#fr-panel']) U.$(id).checked = true;
-        U.$('#fr-foliage').checked = false;
+        for (const id of ['#fr-bubbles', '#fr-bubble-text', '#fr-hud', '#fr-sign', '#fr-poles', '#fr-foliage', '#fr-panel']) U.$(id).checked = true;
         for (const role of ['granny', 'robot']) { U.$('#fr-mb-' + role).checked = false; GB.Bubbles.manual(role, false); }
         document.body.classList.remove('framing-no-bubbles', 'framing-no-bubble-text', 'framing-no-hud');
         this._frameBubbleHeight(0);
