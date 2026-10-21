@@ -400,7 +400,7 @@
       tp.push(P(rnd() < 0.6 ? pineGeo(s) : roundGeo(s, placed), [x, y - 0.05, z], [0, rnd.range(0, PI * 2), 0]));
       placed++;
     }
-    const rp = [];   // rocks are a mesh of their own, so framing mode can hide them
+    const rp = [];   // rocks, bushes and flowers are a mesh of their own, so framing mode can remove them
     for (let i = 0; i < 45; i++) {
       const x = rnd.range(-90, 90), z = rnd.range(-60, 160);
       if (Math.abs(x) < 3.2 || Math.hypot(x - 3, z - 1) < 6) continue;
@@ -411,20 +411,20 @@
       const x = rnd.range(-40, 50), z = rnd.range(-25, 80);
       if (Math.abs(x) < 2.6 || Math.hypot(x - 7, z - 1.5) < 2.5 || Math.hypot(x + 3.4, z - 3.6) < 2) continue;
       const s = rnd.range(0.25, 0.6);
-      tp.push(P(G.icosphere(s, 1, rnd() > 0.5 ? '#5f9a4c' : '#6eae58', 0.18, i + 100), [x, M.groundHeight(x, z) + s * 0.4, z], null, [1, 0.75, 1]));
+      rp.push(P(G.icosphere(s, 1, rnd() > 0.5 ? '#5f9a4c' : '#6eae58', 0.18, i + 100), [x, M.groundHeight(x, z) + s * 0.4, z], null, [1, 0.75, 1]));
     }
     // flowers near the set
     const flowerCols = ['#ffffff', '#ffd23f', '#ff7a9c', '#b48cff'];
     for (let i = 0; i < 90; i++) {
       const x = rnd.range(-14, 18), z = rnd.range(-12, 18);
       if (Math.abs(x) < 2.3 || Math.hypot(x - 7, z - 1.4) < 1.6) continue;
-      tp.push(P(G.icosphere(0.06, 0, rnd.pick(flowerCols)), [x, 0.06, z]));
-      tp.push(P(G.cylinder(0.008, 0.008, 0.12, 3, '#4c8a3e'), [x, 0.02, z]));
+      rp.push(P(G.icosphere(0.06, 0, rnd.pick(flowerCols)), [x, 0.06, z]));
+      rp.push(P(G.cylinder(0.008, 0.008, 0.12, 3, '#4c8a3e'), [x, 0.02, z]));
     }
     const trees = mesh(R, G.jitter(G.merge(tp), 0.06, 99), 'trees');
     nodes.push(trees);
-    const rocks = mesh(R, G.jitter(G.merge(rp), 0.06, 98), 'rocks');
-    nodes.push(rocks);
+    const foliage = mesh(R, G.jitter(G.merge(rp), 0.06, 98), 'foliage');
+    nodes.push(foliage);
 
     // telegraph poles and wires along the track
     const pp = [];
@@ -472,7 +472,7 @@
       nodes.push(cl);
     }
 
-    return { nodes, clouds, poles, rocks };
+    return { nodes, clouds, poles, foliage };
   };
 
   // Wooden sign on posts; the board's texture is drawn by the world.

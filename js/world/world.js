@@ -98,7 +98,7 @@
       for (const n of sc.nodes) scene.add(n);
       this.clouds = sc.clouds;
       this.poles = sc.poles;
-      this.rocks = sc.rocks;
+      this.foliage = sc.foliage;   // rocks, bushes and flowers
       scene.add(M.track(R, -320, 340));
 
       // granny
