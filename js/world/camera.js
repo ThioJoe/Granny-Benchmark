@@ -10,11 +10,13 @@
     granny: () => ({ pos: [1.05, 1.55, -2.45], target: [0.05, 1.12, 0.25] }),
     grannyClose: () => ({ pos: [0.62, 1.38, -1.3], target: [0, 1.22, 0.1], fov: 0.8 }),
     track: () => ({ pos: [-1.45, 0.5, -3.7], target: [0, 1.7, 22] }),
-    robot: () => ({ pos: [2.55, 2.1, -0.3], target: [4.2, 1.05, 1.2] }),
-    terminal: () => ({ pos: [3.54, 1.32, 1.18], target: [3.98, 1.06, 1.2], fov: 1.05 }),
-    robotFront: () => ({ pos: [2.0, 1.75, 3.7], target: [3.3, 1.45, 1.2] }),
-    panel: () => ({ pos: [2.42, 1.42, 3.42], target: [4.0, 1.15, 2.45], fov: 0.9 }),
-    panelWide: () => ({ pos: [2.0, 2.3, 5.5], target: [3.6, 1.0, 1.9] }),
+    // The robot's corner follows w.station (its distance from the track, 3.3 m unless framing mode moves it).
+    // These cameras stay beside the track, never above it, where a stopped train would be.
+    robot: (w) => { const s = w.station - 3.3; return { pos: [Math.max(1.9, 2.55 + s), 2.1, -0.3], target: [4.2 + s, 1.05, 1.2] }; },
+    terminal: (w) => { const s = w.station - 3.3; return { pos: [3.54 + s, 1.32, 1.18], target: [3.98 + s, 1.06, 1.2], fov: 1.05 }; },
+    robotFront: (w) => { const x = w.station, dx = Math.min(2.35, x - 2.0); return { pos: [x - dx, 1.75, 1.2 + Math.sqrt(2.815 * 2.815 - dx * dx)], target: [x, 1.45, 1.2] }; },
+    panel: (w) => { const s = w.station - 3.3; return { pos: [Math.max(1.9, 2.42 + s), 1.42, 3.42], target: [4.0 + s, 1.15, 2.45], fov: 0.9 }; },
+    panelWide: (w) => { const x = w.station + 0.3, dx = Math.min(2.6, x - 2.0); return { pos: [x - dx, 2.3, 1.9 + Math.sqrt(3.97 * 3.97 - dx * dx)], target: [x, 1.0, 1.9] }; },
     side: () => ({ pos: [-16, 3.2, 9], target: [0, 1.3, 7] }),
     aerial: () => ({ pos: [34, 48, -42], target: [2, 0, 12] }),
     tower: () => ({ pos: [-15, 7, -13], target: [0, 7.5, 9] }),
@@ -25,8 +27,8 @@
       const rise = Math.max(0, p[1] - 2);
       return { pos: [p[0] - 6.5 + Math.min(rise, 4), Math.max(1.4, p[1] - 2.2), p[2] - 8.5 + Math.min(rise, 3)], target: [p[0], p[1] + 0.5, p[2]], fov: 0.9 };
     },
-    bowlingLane: () => ({ pos: [10.5, 3.2, -6.5], target: [2.6, 0.9, 0.4] }),
-    bowlingLanding: () => ({ pos: [8.5, 1.7, -2.5], target: [4.0, 0.95, -0.4], fov: 0.85 }),
+    bowlingLane: (w) => { const s = w.station - 3.3; return { pos: [10.5 + s, 3.2, -6.5], target: [2.6 + 0.8 * s, 0.9, 0.4] }; },
+    bowlingLanding: (w) => { const x = w.station; return { pos: [x + 5.2, 1.7, -2.5], target: [x + 0.7, 0.95, -0.4], fov: 0.85 }; },
     idleOrbit: (w) => {
       const a = w.t * 0.045 + 3.9;
       return { pos: [2.5 + Math.cos(a) * 16, 8.6 + Math.sin(w.t * 0.07) * 1.2, 3 + Math.sin(a) * 16], target: [2.6, 1.0, 3.5] };

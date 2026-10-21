@@ -193,6 +193,7 @@ body.panel-resizing #view { pointer-events: none; }
 .framing > * { max-width: 460px; }
 .framing h2 { display: flex; align-items: center; justify-content: space-between; }
 .framing input[type="range"] { width: 100%; }
+.framing .small-link { font-size: 11.5px; font-weight: 400; margin-left: 4px; }
 .fr-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: -6px 0 8px; }
 .fr-presets { display: flex; align-items: center; gap: 6px; margin: -4px 0 8px; }
 .fr-checks { display: flex; flex-wrap: wrap; gap: 0 18px; }

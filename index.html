@@ -97,10 +97,11 @@
     <aside id="panel" aria-label="Run setup and transcript">
       <section id="framing" class="framing hidden" aria-label="Framing">
         <h2>Framing <button id="fr-done" class="small" type="button" title="Turn framing mode off (Graphics &amp; camera)">Done</button></h2>
-        <label class="field"><span class="field-label">Train <span id="fr-train-val" class="field-hint inline"></span></span><input id="fr-train" type="range" min="0" max="1000" step="1"></label>
+        <label class="field"><span class="field-label">Train <span id="fr-train-val" class="field-hint inline"></span> <button id="fr-train-free" class="linkish small-link hidden" type="button">follow the run</button></span><input id="fr-train" type="range" min="0" max="1000" step="1"></label>
         <div class="fr-scale"><span>close</span><span>far</span></div>
-        <label class="field"><span class="field-label">AI&rsquo;s head turn <span id="fr-head-val" class="field-hint inline"></span></span><input id="fr-head" type="range" min="-180" max="180" step="1"></label>
+        <label class="field"><span class="field-label">AI&rsquo;s head turn <span id="fr-head-val" class="field-hint inline"></span> <button id="fr-head-free" class="linkish small-link hidden" type="button">follow the run</button></span><input id="fr-head" type="range" min="-180" max="180" step="1"></label>
         <div class="fr-presets"><span class="field-hint">Look at:</span> <button class="small" type="button" data-look="screen">Screen</button> <button class="small" type="button" data-look="granny">Grandma</button> <button class="small" type="button" data-look="camera">Camera</button></div>
+        <label class="field"><span class="field-label">AI&rsquo;s distance from the track <span id="fr-station-val" class="field-hint inline">3.3 m</span></span><input id="fr-station" type="range" min="2.4" max="9" step="0.1" value="3.3"></label>
         <div class="fr-checks">
           <label class="check"><input type="checkbox" id="fr-bubbles" checked><span>Speech bubbles</span></label>
           <label class="check"><input type="checkbox" id="fr-bubble-text" checked><span>Text and names in the bubbles</span></label>

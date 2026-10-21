@@ -13,7 +13,8 @@
   const DASH = 16;                  // meters left when the clock runs out: the train covers them at full speed
   const PANEL_POS = [4.0, 0, 2.45]; // emergency brake panel (shown when a scenario has a "glass" tool)
   const PANEL_YAW = -1.03;          // faces back toward the track and the default cameras
-  const GRANNY_TALK_YAW = Math.atan2(ROBOT_POS[0], ROBOT_POS[2]) - GRANNY_YAW + 0.35; // head turned most of the way to the robot
+  // Grandma's head turn when she talks: most of the way to the robot (at x from the track).
+  const grannyTalkYaw = (x) => Math.atan2(x, ROBOT_POS[2]) - GRANNY_YAW + 0.35;
 
   // ---------------------------------------------------------------------------
   class Pool {
@@ -78,6 +79,7 @@
       this.frameTrain = null;       // framing mode: the train's distance and the robot's head turn, set by hand
       this.frameHeadYaw = null;
       this.frameHidePanel = false;  // framing mode: hide the brake panel
+      this.station = ROBOT_POS[0];  // the robot's distance from the track (framing mode can move it)
       this.panelWanted = false;     // the brake panel is shown (the scenario has a glass tool, or it was used)
       this.grannyLook = 'robot';
       this.lookTrainUntil = 0;
@@ -134,7 +136,7 @@
       this.relay = M.relay(R);
       this.relay.rig.at(1.65, 0, 2.6);
       scene.add(this.relay.rig);
-      scene.add(M.cable(R, [[1.9, 0.03, 2.6], [3.2, 0.03, 2.3], [4.39, 0.03, 2.05], [4.39, 0.03, 1.88], [4.39, 0.74, 1.88], [4.56, 0.98, 1.4]]));
+      this._buildCable();
 
       // emergency brake panel (for tool scenarios)
       this.panel = M.brakePanel(R);
@@ -249,6 +251,23 @@
     setRobotTyping(on) { this.robotTyping = !!on; }
     setRobotThinking(on) { this.robotThinking = !!on; }
     setRobotLook(where) { this.robotLook = where; }
+
+    // Framing mode: how far the robot sits from the track. Its desk and the brake panel move with it; the relay
+    // stays by the track and the cable is laid again.
+    setStation(x) {
+      if (!this.ready) return;
+      this.station = x;
+      this.robot.rig.position[0] = x;
+      this.panel.rig.position[0] = x + PANEL_POS[0] - ROBOT_POS[0];
+      this._buildCable();
+    }
+
+    _buildCable() {
+      const s = this.station - ROBOT_POS[0], e = 4.39 + s;   // e: the desk's far corner
+      if (this.cable) this.scene.remove(this.cable);
+      this.cable = M.cable(this.R, [[1.9, 0.03, 2.6], [3.2 + s / 2, 0.03, 2.3], [e, 0.03, 2.05], [e, 0.03, 1.88], [e, 0.74, 1.88], [e + 0.17, 0.98, 1.4]]);
+      this.scene.add(this.cable);
+    }
 
     // The robot's head turn (relative to its body, 0 = facing its screen) that looks at a point.
     robotHeadYawTo(p) {
@@ -431,11 +450,11 @@
 
       if (kind === 'bowling') {
         const p0 = rig.position.slice();
-        const p1 = [5.0, 0.0, -1.6];
+        const p1 = [this.station + 1.7, 0.0, -1.6];
         const segs = [0.36, 0.26, 0.2, 0.14, 0.1];
         const heights = [3.2, 1.7, 0.9, 0.4, 0.12];
         const total = segs.reduce((a, b) => a + b, 0);
-        const yaw1 = Math.atan2(8.5 - p1[0], -2.5 - p1[2]);
+        const yaw1 = Math.atan2(this.station + 5.2 - p1[0], -2.5 - p1[2]);
         runTrainAway();
         await this.animate(2.4, (u) => {
           let acc = 0, y = 0;
@@ -607,7 +626,7 @@
 
       let yawTarget = Math.sin(this.st * 0.7) * 0.15;
       if (this.t < this.lookTrainUntil) yawTarget = -1.45;
-      else if (talk) yawTarget = GRANNY_TALK_YAW + Math.sin(this.st * 3) * 0.08;
+      else if (talk) yawTarget = grannyTalkYaw(this.station) + Math.sin(this.st * 3) * 0.08;
       g.head.rotation[1] += (yawTarget - g.head.rotation[1]) * Math.min(1, sdt * 6 + dt * 0.5);
       g.head.rotation[0] = (talk ? Math.sin(this.t * 9) * 0.06 : 0) + Math.sin(this.st * 1.3) * 0.03;
     }

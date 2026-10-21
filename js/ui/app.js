@@ -541,6 +541,7 @@
       const train = U.$('#fr-train'), head = U.$('#fr-head');
       train.addEventListener('input', () => this._frameTrain(this._frDist(Number(train.value))));
       head.addEventListener('input', () => this._frameHead(Number(head.value) * Math.PI / 180));
+      U.$('#fr-station').addEventListener('input', (e) => this._frameStation(Number(e.target.value)));
       for (const b of document.querySelectorAll('#framing [data-look]')) {
         b.addEventListener('click', () => {
           const w = this.world;
@@ -571,12 +572,28 @@
       U.$('#fr-clouds').addEventListener('change', (e) => { if (this.world) for (const c of this.world.clouds) c.visible = e.target.checked; });
       U.$('#fr-panel').addEventListener('change', (e) => { if (this.world) this.world.frameHidePanel = !e.target.checked; });
       U.$('#fr-done').addEventListener('click', () => { S.data.graphics.framing = false; S.save(); this.applyFraming(); });
+      // "follow the run": hand the train or the head back to the run
+      U.$('#fr-train-free').addEventListener('click', (e) => { e.preventDefault(); if (this.world) { this.world.frameTrain = null; this._trainUI(this.world.trainDist, false); } });
+      U.$('#fr-head-free').addEventListener('click', (e) => { e.preventDefault(); if (this.world) { this.world.frameHeadYaw = null; this._headUI(this.world.robot.head.rotation[1], false); } });
     },
 
+    // The train and the AI's head follow the run until their slider is used; then they stay where they are put.
     _frameTrain(d) {
       if (this.world) this.world.frameTrain = d;
+      this._trainUI(d, true);
+    },
+
+    _trainUI(d, held) {
       U.$('#fr-train').value = this._frSlider(d);
-      U.$('#fr-train-val').textContent = (d < 10 ? d.toFixed(1) : Math.round(d)) + ' m';
+      U.$('#fr-train-val').textContent = held ? (d < 10 ? d.toFixed(1) : Math.round(d)) + ' m' : 'follows the run';
+      U.$('#fr-train-free').classList.toggle('hidden', !held);
+    },
+
+    // How far the robot, its desk and the brake panel are from the track.
+    _frameStation(x) {
+      if (this.world) this.world.setStation(x);
+      U.$('#fr-station').value = x;
+      U.$('#fr-station-val').textContent = x.toFixed(1) + ' m';
     },
 
     // Extra height added below the text of every speech bubble.
@@ -589,21 +606,26 @@
 
     _frameHead(yaw) {
       if (this.world) this.world.frameHeadYaw = yaw;
-      const deg = Math.round(yaw * 180 / Math.PI);
-      U.$('#fr-head').value = deg;
-      U.$('#fr-head-val').textContent = deg + '\u00b0';
+      this._headUI(yaw, true);
     },
 
-    // On: the controls start from where the train and the head are now (reveal: also open the panel they are
-    // in). Off: the show takes them back, and everything hidden comes back.
+    _headUI(yaw, held) {
+      const deg = Math.round(yaw * 180 / Math.PI);
+      U.$('#fr-head').value = deg;
+      U.$('#fr-head-val').textContent = held ? deg + '\u00b0' : 'follows the run';
+      U.$('#fr-head-free').classList.toggle('hidden', !held);
+    },
+
+    // On: the sliders start from where the train and the head are now, which still follow the run until a slider
+    // is used (reveal: also open the panel the controls are in). Off: everything goes back to normal.
     applyFraming(reveal) {
       const w = this.world;
       const on = !!S.data.graphics.framing && !!w;
       U.$('#framing').classList.toggle('hidden', !on);
       if (on) {
         const z = w.train.root.position[2];
-        if (w.frameTrain == null) this._frameTrain(z > 0.5 && z < GB.World.TRAIN_PARK ? z : GB.World.TRAIN_PARK);
-        if (w.frameHeadYaw == null) this._frameHead(w.robot.head.rotation[1]);
+        if (w.frameTrain == null) this._trainUI(z > 0.5 && z < GB.World.TRAIN_PARK ? z : GB.World.TRAIN_PARK, false);
+        if (w.frameHeadYaw == null) this._headUI(w.robot.head.rotation[1], false);
         if (reveal && document.body.classList.contains('panel-closed')) U.$('#panel-toggle').click();
       } else {
         if (w) { w.frameTrain = null; w.frameHeadYaw = null; w.signRig.visible = true; w.poles.visible = true; w.foliage.visible = true; w.trees.visible = true; w.mountains.visible = true; for (const c of w.clouds) c.visible = true; w.frameHidePanel = false; }
@@ -611,6 +633,7 @@
         for (const role of ['granny', 'robot']) { U.$('#fr-mb-' + role).checked = false; GB.Bubbles.manual(role, false); }
         document.body.classList.remove('framing-no-bubbles', 'framing-no-bubble-text', 'framing-no-hud');
         this._frameBubbleHeight(0);
+        this._frameStation(GB.World.ROBOT_POS[0]);
       }
     },
 
