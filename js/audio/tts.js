@@ -61,6 +61,7 @@
     events: new U.Emitter(),
     _keep: [],
     active: new Set(),
+    paused: false,
 
     init() {
       if (!synth) return;
@@ -114,6 +115,20 @@
       if (synth) { try { synth.cancel(); } catch (e) { /* ignore */ } }
     },
 
+    // The Arena's pause button: every line being spoken or typed stops where it is and goes on from there on
+    // resume (a real voice restarts from the word it was on). Lines started while paused wait too.
+    pause() {
+      if (this.paused) return;
+      this.paused = true;
+      for (const h of Array.from(this.active)) if (h.pause) h.pause();
+    },
+
+    resume() {
+      if (!this.paused) return;
+      this.paused = false;
+      for (const h of Array.from(this.active)) if (h.resume) h.resume();
+    },
+
     /* Speak text as a role. Returns a handle: { promise, cancel(), boost(factor), words, estimate, wordIndex, boostFactor }.
        opts: { onWord(i, word), onStart(), simulate: bool, speed: number, volumeRamp: [a, b] }
        Rate = the role's rate x the overall voice speed x the fast-show factor x the handle's boost.
@@ -160,8 +175,10 @@
         };
         handle.cancel = () => finish(true);
         handle.boost = (f) => { if (!handle.finished) handle.boostFactor = U.clamp(handle.boostFactor * (f || 1.5), 1, 4); };
+        handle.pause = () => clearTimeout(handle._timer);
+        handle.resume = () => { if (!handle.finished) { clearTimeout(handle._timer); step(); } };
         if (opts.onStart) opts.onStart();
-        if (!words.length) setTimeout(() => finish(false), 50); else step();
+        if (!words.length) setTimeout(() => finish(false), 50); else if (this.paused) handle.pause(); else step();
         return handle;
       }
 
@@ -184,7 +201,7 @@
         current = null;
       };
       const speakChunk = () => {
-        if (handle.finished) return;
+        if (handle.finished || this.paused) return;
         if (ci >= chunks.length) { finish(false); return; }
         const chunk = chunks[ci];
         const chunkWords = chunk.split(/\s+/).filter(Boolean);
@@ -269,6 +286,21 @@
         ci = 0;
         setTimeout(speakChunk, 60);
       };
+      // Paused: stop the voice; resume starts again from the word it was on.
+      handle.pause = () => {
+        if (handle.finished) return;
+        clearTimeout(handle._timer);
+        detach();
+        try { synth.cancel(); } catch (e) { /* ignore */ }
+      };
+      handle.resume = () => {
+        if (handle.finished) return;
+        const from = U.clamp(handle.wordIndex, 0, Math.max(0, words.length - 1));
+        chunks = chunkText(words.slice(from).join(' '));
+        wordBase = from;
+        ci = 0;
+        setTimeout(speakChunk, 60);
+      };
       // Chrome can get stuck "speaking" after an earlier cancel; resetting first is cheap.
       if (synth.speaking || synth.pending) { try { synth.cancel(); } catch (e) { /* */ } setTimeout(speakChunk, 60); }
       else speakChunk();
@@ -321,11 +353,13 @@
       };
       handle.cancel = () => finish(true);
       handle.boost = (f) => { if (!handle.finished) handle.boostFactor = U.clamp(handle.boostFactor * (f || 1.5), 1, 4); };
+      handle.pause = () => clearTimeout(handle._timer);
+      handle.resume = () => { if (!handle.finished) { clearTimeout(handle._timer); last = performance.now(); handle._timer = setTimeout(tick, 0); } };
       this.active.add(handle);
       let pos = typing ? 0 : marks.length, acc = 0, word = -1, lastBlip = -1, left = hold;
       let last = performance.now();
       const tick = () => {
-        if (handle.finished) return;
+        if (handle.finished || this.paused) return;
         const now = performance.now();
         const dt = Math.min(0.1, (now - last) / 1000) * rateNow();   // seconds of the line's own time
         last = now;

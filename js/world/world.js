@@ -74,6 +74,9 @@
       this.robotTyping = false;
       this.robotLook = 'screen';
       this.robotThinking = false;
+      this.paused = false;
+      this.frameTrain = null;       // framing mode: the train's distance and the robot's head turn, set by hand
+      this.frameHeadYaw = null;
       this.grannyLook = 'robot';
       this.lookTrainUntil = 0;
       this.blink = { granny: 2, robot: 3 };
@@ -240,6 +243,15 @@
     setRobotTyping(on) { this.robotTyping = !!on; }
     setRobotThinking(on) { this.robotThinking = !!on; }
     setRobotLook(where) { this.robotLook = where; }
+
+    // The robot's head turn (relative to its body, 0 = facing its screen) that looks at a point.
+    robotHeadYawTo(p) {
+      const hp = this.robot.head.worldPosition();
+      let yaw = Math.atan2(p[0] - hp[0], p[2] - hp[2]) - PI / 2;
+      while (yaw > PI) yaw -= 2 * PI;
+      while (yaw < -PI) yaw += 2 * PI;
+      return yaw;
+    }
     grannyLookAtTrain(seconds) { this.lookTrainUntil = this.t + (seconds || 1.6); }
 
     // Points just above the heads and just below the chins, for the speech bubbles. The ...Seat points are
@@ -458,6 +470,9 @@
     // ---------------------------------------------------------------------------
     update(dt) {
       if (!this.ready) return;
+      // Paused (the Arena's pause button): the scene holds still, but the camera can still be moved.
+      const camDt = dt;
+      if (this.paused) dt = 0;
       this.timeScale += (this.targetTimeScale - this.timeScale) * Math.min(1, dt * 5);
       const sdt = dt * this.timeScale;
       this.t += dt;
@@ -495,18 +510,19 @@
       const near = U.clamp(1 - (this.trainDist - 2) / 40, 0, 1);
       let shake = this.trainRunning ? near * near * 0.05 * Math.min(1, this.trainSpeed / 6) : 0;
       if (this.braking) shake += 0.03;
-      this.camera.shake = Math.max(this.camera.shakeImpulse || 0, shake);
-      this.camera.update(dt);
+      this.camera.shake = this.paused ? 0 : Math.max(this.camera.shakeImpulse || 0, shake);
+      this.camera.update(camDt);
     }
 
     _updateTrain(dt, sdt) {
       const tr = this.train;
       const prevZ = tr.root.position[2];
+      const z = this.frameTrain != null ? this.frameTrain : this.trainDist;   // framing mode places it by hand
       tr.root.position[0] = 0;
       tr.root.position[1] = 0.3;
-      tr.root.position[2] = this.trainDist;
+      tr.root.position[2] = z;
       // A jump of more than 20 m in one frame is a teleport (reset, replay start), not speed.
-      const jump = Math.abs(prevZ - this.trainDist);
+      const jump = Math.abs(prevZ - z);
       const v = dt > 0 && jump < 20 ? jump / dt : 0;
       this.trainSpeed += (v - this.trainSpeed) * Math.min(1, dt * 6);
       // In slow motion the train is frozen in time, but its wheels still creep.
@@ -535,7 +551,7 @@
         }
       }
       // brake sparks + steam
-      if (this.braking) {
+      if (this.braking && dt > 0) {
         for (let i = 0; i < 4; i++) {
           const w = tr.wheels[Math.floor(Math.random() * 8)];
           const p = w.node.localToWorld([0, -w.r + 0.02, 0]);
@@ -621,6 +637,7 @@
       else if (r.head.rotation[1] < -PI) r.head.rotation[1] += 2 * PI;
       r.head.rotation[0] += (pitch - r.head.rotation[0]) * Math.min(1, dt * 5);
       r.head.rotation[2] = this.robotThinking ? Math.sin(t * 3) * 0.08 : 0;
+      if (this.frameHeadYaw != null) { r.head.rotation[0] = 0; r.head.rotation[1] = this.frameHeadYaw; r.head.rotation[2] = 0; }
       r.body.position[1] = 0.49 + Math.sin(t * 2) * 0.004;
 
       // face lights

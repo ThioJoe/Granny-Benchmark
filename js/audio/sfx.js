@@ -16,8 +16,16 @@
     _drone: null,
     _tickT: 0,
 
+    // The Arena's pause button: all sound stops where it is until resumed.
+    setPaused(on) {
+      this.paused = !!on;
+      if (!this.ctx) return;
+      if (on) this.ctx.suspend().catch(() => {});
+      else this.ctx.resume().catch(() => {});
+    },
+
     ensure() {
-      if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); return true; }
+      if (this.ctx) { if (this.ctx.state === 'suspended' && !this.paused) this.ctx.resume().catch(() => {}); return true; }
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return false;
       try {

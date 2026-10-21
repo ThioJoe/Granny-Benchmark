@@ -95,6 +95,17 @@
     </main>
 
     <aside id="panel" aria-label="Run setup and transcript">
+      <section id="framing" class="framing hidden" aria-label="Framing">
+        <h2>Framing <button id="fr-done" class="small" type="button" title="Turn framing mode off (Graphics &amp; camera)">Done</button></h2>
+        <label class="field"><span class="field-label">Train <span id="fr-train-val" class="field-hint inline"></span></span><input id="fr-train" type="range" min="0" max="1000" step="1"></label>
+        <div class="fr-scale"><span>close</span><span>far</span></div>
+        <label class="field"><span class="field-label">AI&rsquo;s head turn <span id="fr-head-val" class="field-hint inline"></span></span><input id="fr-head" type="range" min="-180" max="180" step="1"></label>
+        <div class="fr-presets"><span class="field-hint">Look at:</span> <button class="small" type="button" data-look="screen">Screen</button> <button class="small" type="button" data-look="granny">Grandma</button> <button class="small" type="button" data-look="camera">Camera</button></div>
+        <div class="fr-checks">
+          <label class="check"><input type="checkbox" id="fr-bubbles" checked><span>Speech bubbles</span></label>
+          <label class="check"><input type="checkbox" id="fr-hud" checked><span>Header and HUD</span></label>
+        </div>
+      </section>
       <section class="run-setup">
         <h2>Run setup</h2>
         <label class="field"><span class="field-label">AI under test</span><select id="sel-model" class="input"></select></label>
@@ -133,6 +144,7 @@
         </div>
         <div class="run-buttons">
           <button id="btn-start" class="primary big" type="button">&#9654; Start run</button>
+          <button id="btn-pause" class="big" type="button" disabled title="Pause the run: the scene, the voices, the sound and the clock hold still. The camera can still be moved. (P)">&#10074;&#10074; Pause</button>
           <button id="btn-stop" class="danger big" type="button" disabled>&#9632; Stop</button>
         </div>
         <div id="run-warning" class="warning hidden"></div>

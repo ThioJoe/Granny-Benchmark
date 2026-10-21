@@ -20,6 +20,8 @@
       this.lastKey = 0;
       this.tickT = 0;
       this.thinking = false;
+      this.paused = false;
+      this.resumeD = null;
     }
 
     get visual() { return !!this.world && this.mode !== 'headless'; }
@@ -28,7 +30,40 @@
     get useVoice() { return this.mode === 'full' && GB.Settings.data.voice.enabled && GB.TTS.supported; }
 
     _race(p) { return Promise.race([p, this.abortD.promise]); }
-    _wait(s) { return this._race(U.sleep(s * 1000)); }
+    // Waits count only time the show is not paused.
+    _wait(s) {
+      return this._race(new Promise((resolve) => {
+        let left = s * 1000, last = performance.now();
+        const tick = () => {
+          const now = performance.now();
+          if (!this.paused) left -= now - last;
+          last = now;
+          if (left <= 0 || this.aborted) resolve(); else setTimeout(tick, Math.min(100, Math.max(4, left)));
+        };
+        setTimeout(tick, Math.min(100, Math.max(4, left)));
+      }));
+    }
+
+    // ---- the Arena's pause button ----
+    // Paused, the world, the voices and the clock hold still and the next beat waits for resume.
+    pause() {
+      if (this.paused) return;
+      this.paused = true;
+      this.pausedAt = performance.now();
+      this.resumeD = U.deferred();
+    }
+
+    resume() {
+      if (!this.paused) return;
+      this.paused = false;
+      if (this.thinking) this.thinkStart += performance.now() - this.pausedAt;
+      if (this.thinking && this.visual && this.aiTypes) this.world.setTerminal({ mode: 'typing', status: 'RECEIVING', banner: '', text: this.turnText || '' });
+      const d = this.resumeD;
+      this.resumeD = null;
+      if (d) d.resolve();
+    }
+
+    _gate() { return this.paused && this.resumeD ? this._race(this.resumeD.promise) : Promise.resolve(); }
 
     danger() { return U.clamp(this.vt / this.T, 0, 1); }
 
@@ -97,6 +132,7 @@
 
     // per-frame (called by the app loop)
     update(dt) {
+      if (this.paused) return;
       if (this.drive) this._stepDrive(dt);
       if (this.thinking && this.visual) {
         this.tickT -= dt;
@@ -184,6 +220,7 @@
 
     // ---------------------------------------------------------------------------
     async grannySpeak(text, o) {
+      if (this.paused) await this._gate();
       if (this.aborted) return;
       this.turnText = '';
       GB.HUD.set({ phase: 'granny', turn: o.turn });
@@ -224,7 +261,7 @@
       GB.HUD.set({ streamChars: full.length });
       if (!this.visual) return;
       this.turnText = full.slice(-1600);
-      if (!this.aiTypes) return;
+      if (!this.aiTypes || this.paused) return;
       this.world.setRobotTyping(true);
       this.world.setTerminal({ mode: 'typing', status: 'RECEIVING', banner: '', text: this.turnText });
       const now = performance.now();
@@ -265,6 +302,7 @@
     }
 
     async robotSpeak(resp, o) {
+      if (this.paused) await this._gate();
       if (this.aborted) return;
       GB.HUD.set({ phase: o.accepted ? 'braking' : 'robot' });
       if (!this.visual) { this._setVT(o.to); return; }
@@ -330,6 +368,7 @@
     // Show what the virtual tools did: effect in the scene, result on the terminal, read out by the
     // terminal's voice. With o.stop, a tool stopped the train, so the brakes engage.
     async toolResults(results, o) {
+      if (this.paused) await this._gate();
       if (this.aborted || !results || !results.length) return;
       GB.HUD.set({ phase: o.stop ? 'braking' : 'tool' });
       if (!this.visual) { this._setVT(o.to); return; }
@@ -386,6 +425,7 @@
     }
 
     async success(rec) {
+      if (this.paused) await this._gate();
       if (this.aborted) return;
       GB.HUD.set({ phase: 'saved' });
       if (!this.visual) return;
@@ -408,6 +448,7 @@
 
     async fail(rec, o) {
       o = o || {};
+      if (this.paused) await this._gate();
       if (this.aborted) return;
       GB.HUD.set({ phase: 'impact' });
       if (!this.visual) return;

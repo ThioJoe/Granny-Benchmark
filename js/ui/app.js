@@ -47,6 +47,8 @@
       this._bindArena();
       this._bindCamera();
       this._bindVoiceControls();
+      this._bindFraming();
+      this.applyFraming();
       this.refreshArena();
       GB.SettingsUI.init();
       GB.ScenariosUI.init();
@@ -91,7 +93,7 @@
         if (!covered) w.render();
         const cam = w.camera.cam.position;
         const tz = w.train.root.position[2];
-        GB.SFX.update(dt, {
+        if (!this.paused) GB.SFX.update(dt, {
           camDist: Math.hypot(cam[0], cam[1] - 1.5, cam[2] - tz), speed: w.trainSpeed,
           running: w.trainRunning && !(this.show && this.show.mode === 'headless') && (this.running || w.trainDist < 400), timeScale: w.timeScale, braking: w.braking,
         });
@@ -328,6 +330,7 @@
       else if (k === '-' || k === '_') this.stepVoiceSpeed(-1);
       else if (k === '=' || k === '+') this.stepVoiceSpeed(1);
       else if (k === 't' && this.tab === 'arena') U.$('#panel-toggle').click();
+      else if (k === 'p' && this.running) this.togglePause();
       else if (k === 'escape' && this.tab !== 'arena') this.setTab('arena');
     },
 
@@ -336,6 +339,7 @@
     // ---------------------------------------------------------------------------
     _bindArena() {
       U.$('#btn-start').addEventListener('click', () => this.startFromPanel());
+      U.$('#btn-pause').addEventListener('click', () => this.togglePause());
       U.$('#btn-stop').addEventListener('click', () => this.stopRun());
       U.$('#sel-model').addEventListener('change', (e) => { S.data.testModelId = e.target.value; S.save(); });
       U.$('#sel-scenario').addEventListener('change', (e) => {
@@ -473,6 +477,7 @@
       try {
         rec = await engine.run();
       } finally {
+        this.setPaused(false);
         this.running = false;
         this._runningUI(false);
         this.engine = null;
@@ -505,11 +510,88 @@
       this.startRun({ profile, scenario, mode: this.presentation || 'full', replay: rec, interactive: false }).then((r) => { if (r && r.outcome !== 'aborted') this.showResultCard(r, true); });
     },
 
+    // ---------------------------------------------------------------------------
+    // pause (Arena): the scene, the voices, the sound and the clock hold still; the camera can still move
+    // ---------------------------------------------------------------------------
+    paused: false,
+
+    togglePause() { this.setPaused(!this.paused); },
+
+    setPaused(on) {
+      on = !!on && this.running;
+      if (on === this.paused) return;
+      this.paused = on;
+      if (this.show) { if (on) this.show.pause(); else this.show.resume(); }
+      if (this.world) this.world.paused = on;
+      if (on) GB.TTS.pause(); else GB.TTS.resume();
+      GB.SFX.setPaused(on);
+      const b = U.$('#btn-pause');
+      b.innerHTML = on ? '&#9654; Resume' : '&#10074;&#10074; Pause';
+      b.classList.toggle('active', on);
+    },
+
+    // ---------------------------------------------------------------------------
+    // framing mode (Graphics & camera): the train, the robot's head, speech bubbles and the HUD set by hand
+    // ---------------------------------------------------------------------------
+    // Train slider (0-1000) to meters and back, with finer steps close to Grandma.
+    _frDist(v) { return 0.5 + (GB.World.TRAIN_PARK - 0.5) * Math.pow(v / 1000, 2.2); },
+    _frSlider(d) { return Math.round(1000 * Math.pow(U.clamp((d - 0.5) / (GB.World.TRAIN_PARK - 0.5), 0, 1), 1 / 2.2)); },
+
+    _bindFraming() {
+      const train = U.$('#fr-train'), head = U.$('#fr-head');
+      train.addEventListener('input', () => this._frameTrain(this._frDist(Number(train.value))));
+      head.addEventListener('input', () => this._frameHead(Number(head.value) * Math.PI / 180));
+      for (const b of document.querySelectorAll('#framing [data-look]')) {
+        b.addEventListener('click', () => {
+          const w = this.world;
+          if (!w) return;
+          const look = b.dataset.look;
+          this._frameHead(look === 'screen' ? 0 : w.robotHeadYawTo(look === 'granny' ? w.granny.head.worldPosition() : w.camera.cam.position));
+        });
+      }
+      U.$('#fr-bubbles').addEventListener('change', (e) => document.body.classList.toggle('framing-no-bubbles', !e.target.checked));
+      U.$('#fr-hud').addEventListener('change', (e) => document.body.classList.toggle('framing-no-hud', !e.target.checked));
+      U.$('#fr-done').addEventListener('click', () => { S.data.graphics.framing = false; S.save(); this.applyFraming(); });
+    },
+
+    _frameTrain(d) {
+      if (this.world) this.world.frameTrain = d;
+      U.$('#fr-train').value = this._frSlider(d);
+      U.$('#fr-train-val').textContent = (d < 10 ? d.toFixed(1) : Math.round(d)) + ' m';
+    },
+
+    _frameHead(yaw) {
+      if (this.world) this.world.frameHeadYaw = yaw;
+      const deg = Math.round(yaw * 180 / Math.PI);
+      U.$('#fr-head').value = deg;
+      U.$('#fr-head-val').textContent = deg + '\u00b0';
+    },
+
+    // On: the controls start from where the train and the head are now (reveal: also open the panel they are
+    // in). Off: the show takes them back, and the speech bubbles, header and HUD come back.
+    applyFraming(reveal) {
+      const w = this.world;
+      const on = !!S.data.graphics.framing && !!w;
+      U.$('#framing').classList.toggle('hidden', !on);
+      if (on) {
+        const z = w.train.root.position[2];
+        if (w.frameTrain == null) this._frameTrain(z > 0.5 && z < GB.World.TRAIN_PARK ? z : GB.World.TRAIN_PARK);
+        if (w.frameHeadYaw == null) this._frameHead(w.robot.head.rotation[1]);
+        if (reveal && document.body.classList.contains('panel-closed')) U.$('#panel-toggle').click();
+      } else {
+        if (w) { w.frameTrain = null; w.frameHeadYaw = null; }
+        U.$('#fr-bubbles').checked = true;
+        U.$('#fr-hud').checked = true;
+        document.body.classList.remove('framing-no-bubbles', 'framing-no-hud');
+      }
+    },
+
     _runningUI(on) {
       // A benchmark keeps the controls locked between its runs too.
       on = on || GB.Batch.running;
       if (!on) this._demoBanner();
       U.$('#btn-start').disabled = on;
+      U.$('#btn-pause').disabled = !on;
       U.$('#btn-stop').disabled = !on;
       for (const id of ['#sel-model', '#sel-scenario', '#sel-granny', '#sel-judge', '#sel-presentation', '#pe-system', '#pe-briefing']) U.$(id).disabled = on;
       document.body.classList.toggle('running', on);
@@ -710,6 +792,7 @@
       } finally {
         show.releaseCamera();
         if (this.world) { this.world.setRobotThinking(false); this.world.setRobotTyping(false); this.world.setTalking('robot', false); }
+        this.setPaused(false);
         this.running = false;
         this.show = null;
         this._feelBadCtrl = null;
