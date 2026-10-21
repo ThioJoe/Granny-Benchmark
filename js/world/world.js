@@ -98,6 +98,7 @@
       for (const n of sc.nodes) scene.add(n);
       this.clouds = sc.clouds;
       this.poles = sc.poles;
+      this.rocks = sc.rocks;
       scene.add(M.track(R, -320, 340));
 
       // granny

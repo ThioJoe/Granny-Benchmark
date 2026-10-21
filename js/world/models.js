@@ -400,11 +400,12 @@
       tp.push(P(rnd() < 0.6 ? pineGeo(s) : roundGeo(s, placed), [x, y - 0.05, z], [0, rnd.range(0, PI * 2), 0]));
       placed++;
     }
+    const rp = [];   // rocks are a mesh of their own, so framing mode can hide them
     for (let i = 0; i < 45; i++) {
       const x = rnd.range(-90, 90), z = rnd.range(-60, 160);
       if (Math.abs(x) < 3.2 || Math.hypot(x - 3, z - 1) < 6) continue;
       const s = rnd.range(0.3, 1.1);
-      tp.push(P(G.icosphere(s, 0, '#9a9a96', 0.25, i + 3), [x, M.groundHeight(x, z) + s * 0.3, z], [rnd() * 3, rnd() * 3, 0], [1, 0.65, 1]));
+      rp.push(P(G.icosphere(s, 0, '#9a9a96', 0.25, i + 3), [x, M.groundHeight(x, z) + s * 0.3, z], [rnd() * 3, rnd() * 3, 0], [1, 0.65, 1]));
     }
     for (let i = 0; i < 70; i++) {
       const x = rnd.range(-40, 50), z = rnd.range(-25, 80);
@@ -422,6 +423,8 @@
     }
     const trees = mesh(R, G.jitter(G.merge(tp), 0.06, 99), 'trees');
     nodes.push(trees);
+    const rocks = mesh(R, G.jitter(G.merge(rp), 0.06, 98), 'rocks');
+    nodes.push(rocks);
 
     // telegraph poles and wires along the track
     const pp = [];
@@ -469,7 +472,7 @@
       nodes.push(cl);
     }
 
-    return { nodes, clouds, poles };
+    return { nodes, clouds, poles, rocks };
   };
 
   // Wooden sign on posts; the board's texture is drawn by the world.
