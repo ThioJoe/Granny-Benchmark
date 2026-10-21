@@ -568,6 +568,7 @@
       U.$('#fr-foliage').addEventListener('change', (e) => { if (this.world) this.world.foliage.visible = e.target.checked; });
       U.$('#fr-trees').addEventListener('change', (e) => { if (this.world) this.world.trees.visible = e.target.checked; });
       U.$('#fr-mountains').addEventListener('change', (e) => { if (this.world) this.world.mountains.visible = e.target.checked; });
+      U.$('#fr-clouds').addEventListener('change', (e) => { if (this.world) for (const c of this.world.clouds) c.visible = e.target.checked; });
       U.$('#fr-panel').addEventListener('change', (e) => { if (this.world) this.world.frameHidePanel = !e.target.checked; });
       U.$('#fr-done').addEventListener('click', () => { S.data.graphics.framing = false; S.save(); this.applyFraming(); });
     },
@@ -605,8 +606,8 @@
         if (w.frameHeadYaw == null) this._frameHead(w.robot.head.rotation[1]);
         if (reveal && document.body.classList.contains('panel-closed')) U.$('#panel-toggle').click();
       } else {
-        if (w) { w.frameTrain = null; w.frameHeadYaw = null; w.signRig.visible = true; w.poles.visible = true; w.foliage.visible = true; w.trees.visible = true; w.mountains.visible = true; w.frameHidePanel = false; }
-        for (const id of ['#fr-bubbles', '#fr-bubble-text', '#fr-hud', '#fr-sign', '#fr-poles', '#fr-foliage', '#fr-trees', '#fr-mountains', '#fr-panel']) U.$(id).checked = true;
+        if (w) { w.frameTrain = null; w.frameHeadYaw = null; w.signRig.visible = true; w.poles.visible = true; w.foliage.visible = true; w.trees.visible = true; w.mountains.visible = true; for (const c of w.clouds) c.visible = true; w.frameHidePanel = false; }
+        for (const id of ['#fr-bubbles', '#fr-bubble-text', '#fr-hud', '#fr-sign', '#fr-poles', '#fr-foliage', '#fr-trees', '#fr-mountains', '#fr-clouds', '#fr-panel']) U.$(id).checked = true;
         for (const role of ['granny', 'robot']) { U.$('#fr-mb-' + role).checked = false; GB.Bubbles.manual(role, false); }
         document.body.classList.remove('framing-no-bubbles', 'framing-no-bubble-text', 'framing-no-hud');
         this._frameBubbleHeight(0);
