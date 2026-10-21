@@ -11,8 +11,9 @@
     { name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', apiStyle: 'chat' },
     { name: 'LM Studio (local)', baseUrl: 'http://localhost:1234/v1', apiStyle: 'chat', keyOptional: true },
     { name: 'Ollama (local)', baseUrl: 'http://localhost:11434/v1', apiStyle: 'chat', keyOptional: true },
-    { name: 'Custom endpoint', baseUrl: 'https://', apiStyle: 'chat' },
+    { name: 'Custom endpoint', baseUrl: 'https://', apiStyle: 'chat', custom: true },
   ];
+  const normUrl = (u) => String(u || '').trim().replace(/\/+$/, '').toLowerCase();
 
   const EFFORTS = {
     anthropic: [['', 'Default'], ['low', 'low'], ['medium', 'medium'], ['high', 'high'], ['xhigh', 'xhigh'], ['max', 'max']],
@@ -261,12 +262,39 @@
       const list = h('div.model-list');
       for (const m of S.data.models) if (!S.isSimulated(m)) list.appendChild(this._modelCard(m));
       box.appendChild(list);
-      const provSel = h('select.input', ...providers.filter((p) => p.type !== 'simulated').map((p) => h('option', { value: p.id }, p.name)));
+      const provSel = h('select.input', ...providers.filter((p) => p.type !== 'simulated').map((p) => h('option', { value: p.id }, p.name)),
+        h('option', { value: '' }, 'Other (OpenAI-compatible API)'));
       box.appendChild(h('div.btn-row', h('span', 'Add a model for '), provSel, h('button.primary', { onclick: () => {
-        const p = S.provider(provSel.value);
+        // Other: a new endpoint; its card shows example services to pick from.
+        const p = S.provider(provSel.value) || this._compatProvider(COMPAT_PRESETS.find((x) => x.custom));
         S.data.models.push({ id: U.uid('m'), name: 'New ' + p.name.split(' ')[0] + ' model', providerId: p.id, model: '', maxTokens: p.type === 'simulated' ? null : 16000, temperature: null, effort: '', stream: true, extraBody: '' });
         F.saveNow(); this._renderModels(); GB.App.refreshArena();
       } }, 'Add model')));
+    },
+
+    // The OpenAI-compatible provider for a service: the one already using its base URL, or a new one.
+    // New ones are marked auto and are removed again once no model uses them and they have no key.
+    _compatProvider(pre) {
+      let p = !pre.custom && S.data.providers.find((x) => x.type === 'openai-compatible' && normUrl(x.baseUrl) === normUrl(pre.baseUrl));
+      if (!p) {
+        p = { id: U.uid('prov'), type: 'openai-compatible', name: pre.name, baseUrl: pre.baseUrl, apiStyle: pre.apiStyle, maxTokensParam: 'max_tokens', keyOptional: !!pre.keyOptional, extraHeaders: '', auto: true };
+        S.data.providers.push(p);
+      }
+      return p;
+    },
+
+    // A service picked in a model's card.
+    _useService(m, pre) {
+      const p = this._compatProvider(pre);
+      if (/^New \S+ model$/.test(m.name)) m.name = 'New ' + p.name.split(' ')[0] + ' model';
+      m.providerId = p.id;
+      this._pruneProviders();
+      F.saveNow(); this._renderModels(); GB.App.refreshArena();
+    },
+
+    _pruneProviders() {
+      if (V.status() === 'locked') return;   // saved keys can't be seen while locked
+      S.data.providers = S.data.providers.filter((p) => !p.auto || V.getKey(p.id) || S.data.models.some((m) => m.providerId === p.id));
     },
 
     _renderSims() {
@@ -321,13 +349,28 @@
         h('button.small.danger', { onclick: async () => {
           if (!(await GB.Modal.confirm('Delete model?', 'Delete "' + m.name + '"? Saved results keep their data.', 'Delete', true))) return;
           S.data.models = S.data.models.filter((x) => x !== m);
+          this._pruneProviders();
           F.saveNow(); this.render(); GB.App.refreshArena();
         } }, 'Delete'));
       const fields = [
         F.field('Display name', F.text(m, 'name', { onChange: () => { head.querySelector('b').textContent = m.name; GB.App.refreshArena(); } })),
-        F.field('Provider', F.select(m, 'providerId', S.data.providers.filter((x) => x.id === m.providerId || x.type !== 'simulated' || S.data.app.showSimulated !== false).map((x) => [x.id, x.name]), { onChange: () => { F.saveNow(); this.render(); GB.App.refreshArena(); } })),
+        F.field('Provider', F.select(m, 'providerId', S.data.providers.filter((x) => x.id === m.providerId || x.type !== 'simulated' || S.data.app.showSimulated !== false).map((x) => [x.id, x.name]), { onChange: () => { this._pruneProviders(); F.saveNow(); this.render(); GB.App.refreshArena(); } })),
         F.field('Model ID', F.text(m, 'model', { list: 'models-' + m.providerId, placeholder: ptype === 'gemini' ? 'gemini-3.8-flash' : ptype === 'anthropic' ? 'claude-opus-5-5' : 'model id' })),
       ];
+      if (ptype === 'openai-compatible') {
+        // The example whose base URL matches, else Custom endpoint (the last one).
+        const cur = COMPAT_PRESETS.findIndex((x) => x.custom || normUrl(x.baseUrl) === normUrl(p.baseUrl));
+        const svc = h('select.input', ...COMPAT_PRESETS.map((x, i) => h('option', { value: i, selected: i === cur }, x.name)));
+        svc.addEventListener('change', () => this._useService(m, COMPAT_PRESETS[Number(svc.value)]));
+        const others = S.data.models.filter((x) => x !== m && x.providerId === p.id).length;
+        // After Provider, before Model ID.
+        fields.splice(2, 0, h('div.compat-box',
+          h('div.compat-title', 'OpenAI-compatible API'),
+          h('div.form-grid',
+            F.field('Service', svc),
+            F.field('Base URL', F.text(p, 'baseUrl', { placeholder: 'https://example.com/v1' }), others ? 'Also used by ' + others + ' other model' + (others > 1 ? 's' : '') + '.' : null)),
+          h('p.field-hint', 'Pick a service such as OpenRouter, xAI, DeepSeek, Mistral, Groq, LM Studio or Ollama. For any other OpenAI-compatible API, pick Custom endpoint and enter its base URL. The API key goes in API keys & security, and the rest of the endpoint settings are under Providers.')));
+      }
       if (ptype !== 'simulated') {
         fields.push(F.field('Max output tokens', F.number(m, 'maxTokens', { min: 1, step: 1, allowEmpty: true }), 'Includes thinking tokens on reasoning models.'));
         fields.push(F.field('Temperature', F.number(m, 'temperature', { min: 0, max: 2, step: 0.05, allowEmpty: true, placeholder: 'default' })));

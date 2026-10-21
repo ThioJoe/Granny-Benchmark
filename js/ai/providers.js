@@ -631,6 +631,13 @@
     return null;
   }
 
+  // An unfinished base URL (empty, or just "https://") would send the key to the wrong host.
+  function checkBaseUrl(prov) {
+    if (prov.type === 'openai-compatible' && !/^https?:\/\/[^/\s]+/i.test(String(prov.baseUrl || '').trim())) {
+      throw new ApiError('config', 'Set the base URL for ' + prov.name + ' first (in the model card or under Providers).');
+    }
+  }
+
   const AI = {
     ApiError,
     readSSE,
@@ -642,6 +649,7 @@
       if (!prov) throw new ApiError('config', 'Model "' + profile.name + '" points to a provider that no longer exists.');
       const adapter = adapterFor(prov);
       if (!adapter) throw new ApiError('config', 'Unsupported provider type: ' + prov.type);
+      checkBaseUrl(prov);
       const key = GB.Vault.getKey(prov.id);
       if (!key && prov.type !== 'simulated' && !(prov.type === 'openai-compatible' && prov.keyOptional)) {
         throw new ApiError('config', 'No API key for ' + prov.name + '. Add one in the gear menu (API keys & security)' +
@@ -702,6 +710,7 @@
       const prov = GB.Settings.provider(providerId);
       const adapter = adapterFor(prov);
       if (!adapter) throw new ApiError('config', 'Unknown provider.');
+      checkBaseUrl(prov);
       const lister = adapter.listModels || chatCompletions.listModels;
       return lister(prov, GB.Vault.getKey(prov.id));
     },
