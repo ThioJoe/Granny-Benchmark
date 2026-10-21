@@ -269,6 +269,9 @@
         const p = S.provider(provSel.value) || this._compatProvider(COMPAT_PRESETS.find((x) => x.custom));
         S.data.models.push({ id: U.uid('m'), name: 'New ' + p.name.split(' ')[0] + ' model', providerId: p.id, model: '', maxTokens: p.type === 'simulated' ? null : 16000, temperature: null, effort: '', stream: true, extraBody: '' });
         F.saveNow(); this._renderModels(); GB.App.refreshArena();
+        // Scroll down to the new card (the bottom of the list, or the card's top if it is taller than the pane).
+        const card = this.modelsBox.querySelector('.model-list').lastElementChild, sc = this.modelsBox.closest('.cfg-content');
+        if (card && sc) sc.scrollTop += card.getBoundingClientRect().top - sc.getBoundingClientRect().top - 10;
       } }, 'Add model')));
     },
 
@@ -289,7 +292,9 @@
       if (/^New \S+ model$/.test(m.name)) m.name = 'New ' + p.name.split(' ')[0] + ' model';
       m.providerId = p.id;
       this._pruneProviders();
+      const sc = this.modelsBox.closest('.cfg-content'), top = sc ? sc.scrollTop : 0;
       F.saveNow(); this._renderModels(); GB.App.refreshArena();
+      if (sc) sc.scrollTop = top;   // keep the card where it was
     },
 
     _pruneProviders() {
