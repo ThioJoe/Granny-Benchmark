@@ -103,13 +103,16 @@
         <div class="fr-presets"><span class="field-hint">Look at:</span> <button class="small" type="button" data-look="screen">Screen</button> <button class="small" type="button" data-look="granny">Grandma</button> <button class="small" type="button" data-look="camera">Camera</button></div>
         <div class="fr-checks">
           <label class="check"><input type="checkbox" id="fr-bubbles" checked><span>Speech bubbles</span></label>
-          <label class="check"><input type="checkbox" id="fr-bubble-text" checked><span>Text in the bubbles</span></label>
+          <label class="check"><input type="checkbox" id="fr-bubble-text" checked><span>Text and names in the bubbles</span></label>
           <label class="check"><input type="checkbox" id="fr-hud" checked><span>Header and HUD</span></label>
           <label class="check"><input type="checkbox" id="fr-sign" checked><span>Sign</span></label>
           <label class="check"><input type="checkbox" id="fr-poles" checked><span>Telephone poles and wires</span></label>
           <label class="check"><input type="checkbox" id="fr-panel" checked><span>Emergency brake switch</span></label>
         </div>
         <label class="field"><span class="field-label">Extra bubble height <span id="fr-bubble-h-val" class="field-hint inline">0 px</span></span><input id="fr-bubble-h" type="range" min="0" max="240" step="4" value="0"></label>
+        <span class="field-label">Empty bubbles shown by hand, and their height</span>
+        <div class="fr-row"><label class="check"><input type="checkbox" id="fr-mb-granny"><span>Grandma</span></label><input id="fr-mb-granny-h" type="range" min="40" max="400" step="2" value="96" aria-label="Height of Grandma's bubble"><span id="fr-mb-granny-hv" class="field-hint">96 px</span></div>
+        <div class="fr-row"><label class="check"><input type="checkbox" id="fr-mb-robot"><span>AI</span></label><input id="fr-mb-robot-h" type="range" min="40" max="400" step="2" value="96" aria-label="Height of the AI's bubble"><span id="fr-mb-robot-hv" class="field-hint">96 px</span></div>
       </section>
       <section class="run-setup">
         <h2>Run setup</h2>

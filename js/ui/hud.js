@@ -134,6 +134,26 @@
         container.appendChild(el);
         this.items[who] = { el, text: el.querySelector('.bubble-text'), words: [], spans: [], cur: -1, visible: false, fadeT: null };
       }
+      // Framing mode's empty bubbles over Grandma and the AI, shown by hand (separate from the run's own).
+      for (const role of ['granny', 'robot']) {
+        const el = h('div.bubble.manual.' + role + '.hidden', h('div.bubble-name', role === 'granny' ? 'Grandma' : 'AI'), h('div.bubble-text'));
+        container.appendChild(el);
+        this.items[role + 'Manual'] = { el, role, text: el.querySelector('.bubble-text'), words: [], spans: [], cur: -1, visible: false, fadeT: null };
+      }
+    },
+
+    // Show or hide a framing bubble (role 'granny' or 'robot'), with the speaker's name and a height in pixels.
+    manual(role, on, name, height) {
+      const it = this.items[role + 'Manual'];
+      if (!it) return;
+      if (name != null) it.el.querySelector('.bubble-name').textContent = name;
+      if (height != null) it.el.style.minHeight = height + 'px';
+      if (on && !it.visible) {
+        it.visible = true;
+        it.snap = true;
+        it.el.classList.remove('hidden', 'fading');
+        this.frame();
+      } else if (!on && it.visible) this.hide(role + 'Manual');
     },
     setName(who, name) { const it = this.items[who]; if (it) it.el.querySelector('.bubble-name').textContent = name; },
 
@@ -242,7 +262,7 @@
       it.el.classList.remove('fading');
     },
 
-    hideAll() { for (const k in this.items) this.hide(k); },
+    hideAll() { for (const k in this.items) if (!this.items[k].role) this.hide(k); },
 
     frame() {
       if (!this.world || !this.world.ready) {
@@ -278,9 +298,10 @@
       if (insetR > W * 0.45) insetR = 12;
       if (vertical) { inset = sL; insetR = W - W * SAFE.rLow + 3; }   // the buttons are beside the frame
       const mid = vertical ? (sL + W * SAFE.rLow) / 2 : W / 2;
-      for (const who of ['narrator', 'robot', 'granny']) {
+      for (const who of ['narrator', 'robot', 'granny', 'robotManual', 'grannyManual']) {
         const it = this.items[who];
         if (!it.visible) continue;
+        const role = it.role || who;
         if (it.done && it.pos) {
           if (it.pos.docked) dockY = Math.min(dockY, it.pos.y - 8);
           else if (gliding) it.el.classList.add('fading');   // the line is over and the camera moves on
@@ -293,7 +314,7 @@
         if (!docked) {
           // The bubble goes above where the head is at rest, as seen from where the camera is headed, so it
           // stays put while the speaker sways and the camera moves or shakes. Its tail follows the head.
-          this.world.project(anchors[who + 'Seat'], tmp, rest);
+          this.world.project(anchors[role + 'Seat'], tmp, rest);
           docked = tmp.behind || tmp.x < -40 || tmp.x > W + 40 || tmp.y < 30 || tmp.y > H + 20;
           x = U.clamp(tmp.x - bw / 2, sL, sR(0) - bw);
           const top = x < hudR && x + bw > hudL ? Math.max(hudB, sT) : sT;   // it may not go higher (or cover the HUD)
@@ -301,7 +322,7 @@
           // No room above the head: it goes below the chin, with its tail pointing up. (Once below, it needs
           // clearly more room to go back above, so it does not flip between the two.)
           if (y < top + (it.pos && it.pos.below && !it.snap ? 20 : 0)) {
-            this.world.project(anchors[who + 'SeatChin'], tmp, rest);
+            this.world.project(anchors[role + 'SeatChin'], tmp, rest);
             below = true;
             y = tmp.y + 14;
             if (y + bh > sB) { docked = true; below = false; }   // no room below either
@@ -323,7 +344,7 @@
         x = it.pos.x; y = it.pos.y;
         if (!docked) {
           if (x < hudR && x + bw > hudL) y = Math.min(Math.max(y, hudB), sB - bh);
-          this.world.project(anchors[below ? who + 'Chin' : who], head);
+          this.world.project(anchors[below ? role + 'Chin' : role], head);
           it.el.style.setProperty('--tail', U.clamp(head.x - x, 18, bw - 18) + 'px');
         }
         const maxW = vertical ? vMaxW : docked ? Math.max(240, Math.min(720, W - inset - insetR - 4)) + 'px' : '';

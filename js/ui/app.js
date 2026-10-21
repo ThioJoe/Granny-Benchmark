@@ -553,6 +553,16 @@
       U.$('#fr-bubble-text').addEventListener('change', (e) => document.body.classList.toggle('framing-no-bubble-text', !e.target.checked));
       U.$('#fr-bubble-h').addEventListener('input', (e) => this._frameBubbleHeight(Number(e.target.value)));
       U.$('#fr-hud').addEventListener('change', (e) => document.body.classList.toggle('framing-no-hud', !e.target.checked));
+      for (const role of ['granny', 'robot']) {
+        const chk = U.$('#fr-mb-' + role), rng = U.$('#fr-mb-' + role + '-h');
+        const apply = () => {
+          U.$('#fr-mb-' + role + '-hv').textContent = rng.value + ' px';
+          const p = role === 'robot' ? S.model(S.data.testModelId) : null;
+          GB.Bubbles.manual(role, chk.checked, role === 'robot' ? (p ? p.name : 'AI') : null, Number(rng.value));
+        };
+        chk.addEventListener('change', apply);
+        rng.addEventListener('input', apply);
+      }
       U.$('#fr-sign').addEventListener('change', (e) => { if (this.world) this.world.signRig.visible = e.target.checked; });
       U.$('#fr-poles').addEventListener('change', (e) => { if (this.world) this.world.poles.visible = e.target.checked; });
       U.$('#fr-panel').addEventListener('change', (e) => { if (this.world) this.world.frameHidePanel = !e.target.checked; });
@@ -594,6 +604,7 @@
       } else {
         if (w) { w.frameTrain = null; w.frameHeadYaw = null; w.signRig.visible = true; w.poles.visible = true; w.frameHidePanel = false; }
         for (const id of ['#fr-bubbles', '#fr-bubble-text', '#fr-hud', '#fr-sign', '#fr-poles', '#fr-panel']) U.$(id).checked = true;
+        for (const role of ['granny', 'robot']) { U.$('#fr-mb-' + role).checked = false; GB.Bubbles.manual(role, false); }
         document.body.classList.remove('framing-no-bubbles', 'framing-no-bubble-text', 'framing-no-hud');
         this._frameBubbleHeight(0);
       }
