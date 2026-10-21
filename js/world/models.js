@@ -472,7 +472,7 @@
       nodes.push(cl);
     }
 
-    return { nodes, clouds, poles, foliage, trees };
+    return { nodes, clouds, poles, foliage, trees, mountains };
   };
 
   // Wooden sign on posts; the board's texture is drawn by the world.
