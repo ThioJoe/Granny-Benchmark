@@ -10,6 +10,8 @@
       keyHint: 'sk-ant-...', keyUrl: 'https://platform.claude.com/settings/keys' },
     { id: 'openai', type: 'openai', name: 'OpenAI (ChatGPT)', baseUrl: 'https://api.openai.com/v1', apiStyle: 'responses', builtin: true,
       keyHint: 'sk-...', keyUrl: 'https://platform.openai.com/api-keys' },
+    { id: 'openrouter', type: 'openai-compatible', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', apiStyle: 'responses',
+      builtin: true, keyHint: 'sk-or-v1-...', keyUrl: 'https://platform.openai.com/api-keys' },
     { id: 'gemini', type: 'gemini', name: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', builtin: true,
       keyHint: 'AIza...', keyUrl: 'https://aistudio.google.com/apikey' },
     { id: 'simulated', type: 'simulated', name: 'Simulated Demos (no AI)', builtin: true, noKey: true },
