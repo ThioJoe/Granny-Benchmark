@@ -42,7 +42,7 @@ uniform float u_opacity;
 uniform sampler2D u_tex;
 uniform float u_useTex;
 uniform sampler2DShadow u_shadow;
-uniform float u_shadowOn;
+uniform float u_shadowStrength;   // 0 = no shadows, 1 = full
 uniform float u_texel;
 uniform vec3 u_lightDir;
 uniform vec3 u_lightColor;
@@ -82,7 +82,7 @@ void main() {
     vec3 n = normalize(v_nrm);
     if (!gl_FrontFacing) n = -n;
     float ndl = max(dot(n, u_lightDir), 0.0);
-    float sh = u_shadowOn > 0.5 ? shadowFactor(n) : 1.0;
+    float sh = u_shadowStrength > 0.0 ? mix(1.0, shadowFactor(n), u_shadowStrength) : 1.0;
     float hemi = n.y * 0.5 + 0.5;
     vec3 amb = mix(u_groundColor, u_skyColor, hemi);
     col = base * (amb + u_lightColor * ndl * sh);
@@ -169,6 +169,7 @@ void main() {
       this.canvas = canvas;
       this.pixelRatioCap = opts.pixelRatioCap || 1.75;
       this.shadows = opts.shadows !== false;
+      this.shadowStrength = 1;   // how dark the shadows are (framing mode can lighten them)
       this.shadowSize = 2048;
       this.shadowRange = 30;
       this.cssW = 1; this.cssH = 1;
@@ -191,7 +192,7 @@ void main() {
       this._nm = new Float32Array(9);
 
       this.lit = program(gl, LIT_VS, LIT_FS, ['u_model', 'u_viewProj', 'u_nrmMat', 'u_lightVP', 'u_tint', 'u_emissive', 'u_unlit',
-        'u_opacity', 'u_tex', 'u_useTex', 'u_shadow', 'u_shadowOn', 'u_texel', 'u_lightDir', 'u_lightColor', 'u_skyColor',
+        'u_opacity', 'u_tex', 'u_useTex', 'u_shadow', 'u_shadowStrength', 'u_texel', 'u_lightDir', 'u_lightColor', 'u_skyColor',
         'u_groundColor', 'u_camPos', 'u_fogColor', 'u_fogDensity']);
       this.depth = program(gl, DEPTH_VS, DEPTH_FS, ['u_model', 'u_lightVP']);
       this.sky = program(gl, SKY_VS, SKY_FS, ['u_invVP', 'u_camPos', 'u_zenith', 'u_horizon', 'u_ground', 'u_sunDir', 'u_sunColor']);
@@ -326,7 +327,7 @@ void main() {
       this.stats.draws = 0;
 
       // ---- shadow pass ----
-      const shadowOn = this.shadows;
+      const shadowOn = this.shadows && this.shadowStrength > 0;
       if (shadowOn) {
         this._updateLight(cam.shadowFocus || cam.target);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFbo);
@@ -386,7 +387,7 @@ void main() {
       gl.uniform3fv(L.u.u_camPos, this.camPos);
       gl.uniform3fv(L.u.u_fogColor, env.fogColor);
       gl.uniform1f(L.u.u_fogDensity, env.fogDensity);
-      gl.uniform1f(L.u.u_shadowOn, shadowOn ? 1 : 0);
+      gl.uniform1f(L.u.u_shadowStrength, shadowOn ? this.shadowStrength : 0);
       gl.uniform1f(L.u.u_texel, 1 / this.shadowSize);
       gl.uniform1i(L.u.u_tex, 0);
       gl.uniform1i(L.u.u_shadow, 1);
