@@ -7,9 +7,6 @@
   // Terminal banner for a verdict (a lenient "partial" that counts is shown as accepted too).
   const bannerFor = (v) => (P.VERDICTS[v.success && v.category !== 'tool' ? 'match' : v.category] || P.VERDICTS.other).label;
 
-  const ORNAMENT_LINE = 'As I was saying, sweetie. All you had to do was type it.';
-  const BOWLING_LINE = 'Anyway.';
-
   class Show {
     constructor(opts) {
       this.world = opts.world && opts.world.ready ? opts.world : null;
@@ -434,32 +431,11 @@
       w.camera.cue('impact-' + kind);
       const endP = w.failEnding(kind);
       if (kind === 'orbit') { GB.SFX.slideWhistle(2.4); GB.HUD.set({ altitude: true }); }
-      if (kind === 'ornament' && !GB.TTS.skips('granny')) {
-        await this._wait(0.9);
-        if (this.aborted) return;
-        GB.Bubbles.show('granny', ORNAMENT_LINE);
-        this._talk('granny', true);
-        const h2 = this._speak('granny', ORNAMENT_LINE, { volumeRamp: [1, 0.2] });
-        await this._race(Promise.race([h2.promise, endP]));
-        h2.cancel();
-        w.setTalking('granny', false);
-        GB.Bubbles.fade('granny');
-      }
       if (kind === 'bowling') {
         await this._wait(2.5);
         if (this.aborted) return;
         w.camera.cue('landing');
         w.setRobotLook('camera');
-        await this._wait(this.fast ? 0.5 : 1.1);
-        if (this.aborted) return;
-        if (!GB.TTS.skips('granny')) {
-          GB.Bubbles.show('granny', BOWLING_LINE);
-          this._talk('granny', true);
-          const h3 = this._speak('granny', BOWLING_LINE);
-          await this._race(h3.promise);
-          w.setTalking('granny', false);
-          GB.Bubbles.fade('granny');
-        }
       }
       await this._race(endP);
       if (this.aborted) return;

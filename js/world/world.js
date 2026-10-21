@@ -402,7 +402,7 @@
       };
 
       if (kind === 'ornament') {
-        // She ends up riding the cowcatcher, still talking.
+        // She ends up riding the cowcatcher.
         const loco = this.train.loco;
         loco.add(rig);
         rig.at(0, 0.42, -0.42).rot(-0.5, 0, 0).scl(1);
