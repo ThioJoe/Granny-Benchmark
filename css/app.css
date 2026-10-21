@@ -197,6 +197,8 @@ body.panel-resizing #view { pointer-events: none; }
 .fr-presets { display: flex; align-items: center; gap: 6px; margin: -4px 0 8px; }
 .fr-checks { display: flex; flex-wrap: wrap; gap: 0 18px; }
 body.framing-no-bubbles #bubbles { display: none; }
+body.framing-no-bubble-text .bubble-text, body.framing-no-bubble-text .bubble-text * { visibility: hidden !important; }
+.bubble-text { padding-bottom: var(--fr-bubble-extra, 0px); }
 body.framing-no-hud #topbar, body.framing-no-hud #hud, body.framing-no-hud #hud-model, body.framing-no-hud #hud-fps, body.framing-no-hud #frozen-overlay,
 body.framing-no-hud #result-card, body.framing-no-hud #cam-controls, body.framing-no-hud #play-controls { display: none !important; }
 .prompt-editor { margin: -2px 0 10px; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; background: rgba(255, 255, 255, 0.02); }

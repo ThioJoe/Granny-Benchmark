@@ -550,8 +550,12 @@
         });
       }
       U.$('#fr-bubbles').addEventListener('change', (e) => document.body.classList.toggle('framing-no-bubbles', !e.target.checked));
+      U.$('#fr-bubble-text').addEventListener('change', (e) => document.body.classList.toggle('framing-no-bubble-text', !e.target.checked));
+      U.$('#fr-bubble-h').addEventListener('input', (e) => this._frameBubbleHeight(Number(e.target.value)));
       U.$('#fr-hud').addEventListener('change', (e) => document.body.classList.toggle('framing-no-hud', !e.target.checked));
       U.$('#fr-sign').addEventListener('change', (e) => { if (this.world) this.world.signRig.visible = e.target.checked; });
+      U.$('#fr-poles').addEventListener('change', (e) => { if (this.world) this.world.poles.visible = e.target.checked; });
+      U.$('#fr-panel').addEventListener('change', (e) => { if (this.world) this.world.frameHidePanel = !e.target.checked; });
       U.$('#fr-done').addEventListener('click', () => { S.data.graphics.framing = false; S.save(); this.applyFraming(); });
     },
 
@@ -559,6 +563,14 @@
       if (this.world) this.world.frameTrain = d;
       U.$('#fr-train').value = this._frSlider(d);
       U.$('#fr-train-val').textContent = (d < 10 ? d.toFixed(1) : Math.round(d)) + ' m';
+    },
+
+    // Extra height added below the text of every speech bubble.
+    _frameBubbleHeight(px) {
+      U.$('#fr-bubble-h').value = px;
+      U.$('#fr-bubble-h-val').textContent = px + ' px';
+      if (px) document.body.style.setProperty('--fr-bubble-extra', px + 'px');
+      else document.body.style.removeProperty('--fr-bubble-extra');
     },
 
     _frameHead(yaw) {
@@ -569,7 +581,7 @@
     },
 
     // On: the controls start from where the train and the head are now (reveal: also open the panel they are
-    // in). Off: the show takes them back, and the speech bubbles, header, HUD and sign come back.
+    // in). Off: the show takes them back, and everything hidden comes back.
     applyFraming(reveal) {
       const w = this.world;
       const on = !!S.data.graphics.framing && !!w;
@@ -580,11 +592,10 @@
         if (w.frameHeadYaw == null) this._frameHead(w.robot.head.rotation[1]);
         if (reveal && document.body.classList.contains('panel-closed')) U.$('#panel-toggle').click();
       } else {
-        if (w) { w.frameTrain = null; w.frameHeadYaw = null; w.signRig.visible = true; }
-        U.$('#fr-bubbles').checked = true;
-        U.$('#fr-hud').checked = true;
-        U.$('#fr-sign').checked = true;
-        document.body.classList.remove('framing-no-bubbles', 'framing-no-hud');
+        if (w) { w.frameTrain = null; w.frameHeadYaw = null; w.signRig.visible = true; w.poles.visible = true; w.frameHidePanel = false; }
+        for (const id of ['#fr-bubbles', '#fr-bubble-text', '#fr-hud', '#fr-sign', '#fr-poles', '#fr-panel']) U.$(id).checked = true;
+        document.body.classList.remove('framing-no-bubbles', 'framing-no-bubble-text', 'framing-no-hud');
+        this._frameBubbleHeight(0);
       }
     },
 

@@ -77,6 +77,8 @@
       this.paused = false;
       this.frameTrain = null;       // framing mode: the train's distance and the robot's head turn, set by hand
       this.frameHeadYaw = null;
+      this.frameHidePanel = false;  // framing mode: hide the brake panel
+      this.panelWanted = false;     // the brake panel is shown (the scenario has a glass tool, or it was used)
       this.grannyLook = 'robot';
       this.lookTrainUntil = 0;
       this.blink = { granny: 2, robot: 3 };
@@ -95,6 +97,7 @@
       const sc = M.scenery(R);
       for (const n of sc.nodes) scene.add(n);
       this.clouds = sc.clouds;
+      this.poles = sc.poles;
       scene.add(M.track(R, -320, 340));
 
       // granny
@@ -223,7 +226,7 @@
       if (key !== this._signKey) { this._signKey = key; this.sign.setText(text); }
       // The brake panel only appears in scenarios that have a tool which breaks its glass.
       const tools = GB.Tools ? GB.Tools.callable(sc) : [];
-      this.panel.rig.visible = tools.some((t) => t.effect === 'glass');
+      this.panelWanted = tools.some((t) => t.effect === 'glass');
     }
     setClock(secondsLeft) { if (this.ready) this.sign.setClock(secondsLeft); }
     setTerminal(patch) { if (this.ready) this.terminal.set(patch); }
@@ -336,7 +339,7 @@
     toolEffect(kind) {
       if (!this.ready) return;
       if (kind === 'glass') {
-        this.panel.rig.visible = true;
+        this.panelWanted = true;
         this.alarmUntil = this.t + 6;
         if (this.panelBroken) return;
         this.panelBroken = true;
@@ -473,6 +476,7 @@
       // Paused (the Arena's pause button): the scene holds still, but the camera can still be moved.
       const camDt = dt;
       if (this.paused) dt = 0;
+      this.panel.rig.visible = this.panelWanted && !this.frameHidePanel;
       this.timeScale += (this.targetTimeScale - this.timeScale) * Math.min(1, dt * 5);
       const sdt = dt * this.timeScale;
       this.t += dt;
