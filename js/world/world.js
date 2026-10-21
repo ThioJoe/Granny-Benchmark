@@ -5,14 +5,15 @@
   const PI = Math.PI;
 
   const GRANNY_YAW = PI - 0.45;     // she faces away from the train (-Z), angled toward the robot
-  const ROBOT_POS = [6.6, 0, 1.2];
+  const ROBOT_POS = [3.3, 0, 1.2];
   const TRAIN_START = 160;          // distance (m) when the clock starts
   const TRAIN_PARK = 270;           // where it waits before a run
   const IMPACT_DIST = 0.42;
   const STOP_GAP = 0.9;             // closest a braking train gets
   const DASH = 16;                  // meters left when the clock runs out: the train covers them at full speed
-  const PANEL_POS = [7.3, 0, 2.45]; // emergency brake panel (shown when a scenario has a "glass" tool)
+  const PANEL_POS = [4.0, 0, 2.45]; // emergency brake panel (shown when a scenario has a "glass" tool)
   const PANEL_YAW = -1.03;          // faces back toward the track and the default cameras
+  const GRANNY_TALK_YAW = Math.atan2(ROBOT_POS[0], ROBOT_POS[2]) - GRANNY_YAW + 0.35; // head turned most of the way to the robot
 
   // ---------------------------------------------------------------------------
   class Pool {
@@ -124,7 +125,7 @@
       this.relay = M.relay(R);
       this.relay.rig.at(1.65, 0, 2.6);
       scene.add(this.relay.rig);
-      scene.add(M.cable(R, [[1.9, 0.03, 2.6], [3.5, 0.03, 2.3], [5.4, 0.03, 2.15], [7.69, 0.03, 2.05], [7.69, 0.03, 1.88], [7.69, 0.74, 1.88], [7.86, 0.98, 1.4]]));
+      scene.add(M.cable(R, [[1.9, 0.03, 2.6], [3.2, 0.03, 2.3], [4.39, 0.03, 2.05], [4.39, 0.03, 1.88], [4.39, 0.74, 1.88], [4.56, 0.98, 1.4]]));
 
       // emergency brake panel (for tool scenarios)
       this.panel = M.brakePanel(R);
@@ -412,11 +413,11 @@
 
       if (kind === 'bowling') {
         const p0 = rig.position.slice();
-        const p1 = [5.0, 0.0, 0.9];
+        const p1 = [5.0, 0.0, -1.6];
         const segs = [0.36, 0.26, 0.2, 0.14, 0.1];
         const heights = [3.2, 1.7, 0.9, 0.4, 0.12];
         const total = segs.reduce((a, b) => a + b, 0);
-        const yaw1 = Math.atan2(5.55 - p1[0], -2.7 - p1[2]);
+        const yaw1 = Math.atan2(8.5 - p1[0], -2.5 - p1[2]);
         runTrainAway();
         await this.animate(2.4, (u) => {
           let acc = 0, y = 0;
@@ -583,7 +584,7 @@
 
       let yawTarget = Math.sin(this.st * 0.7) * 0.15;
       if (this.t < this.lookTrainUntil) yawTarget = -1.45;
-      else if (talk) yawTarget = -0.95 + Math.sin(this.st * 3) * 0.08;
+      else if (talk) yawTarget = GRANNY_TALK_YAW + Math.sin(this.st * 3) * 0.08;
       g.head.rotation[1] += (yawTarget - g.head.rotation[1]) * Math.min(1, sdt * 6 + dt * 0.5);
       g.head.rotation[0] = (talk ? Math.sin(this.t * 9) * 0.06 : 0) + Math.sin(this.st * 1.3) * 0.03;
     }
@@ -598,8 +599,11 @@
       });
       // head
       let yaw = 0, pitch = 0;
-      if (this.robotLook === 'granny') yaw = PI * 0.98;
-      else if (this.robotLook === 'camera') {
+      if (this.robotLook === 'granny') {
+        const gp = this.granny.head.worldPosition();
+        const hp = r.head.worldPosition();
+        yaw = Math.atan2(gp[0] - hp[0], gp[2] - hp[2]) - PI / 2;
+      } else if (this.robotLook === 'camera') {
         const cp = this.camera.cam.position;
         const hp = r.head.worldPosition();
         const worldYaw = Math.atan2(cp[0] - hp[0], cp[2] - hp[2]);

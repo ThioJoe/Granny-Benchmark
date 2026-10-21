@@ -10,11 +10,11 @@
     granny: () => ({ pos: [1.05, 1.55, -2.45], target: [0.05, 1.12, 0.25] }),
     grannyClose: () => ({ pos: [0.62, 1.38, -1.3], target: [0, 1.22, 0.1], fov: 0.8 }),
     track: () => ({ pos: [-1.45, 0.5, -3.7], target: [0, 1.7, 22] }),
-    robot: () => ({ pos: [5.85, 2.1, -0.3], target: [7.5, 1.05, 1.2] }),
-    terminal: () => ({ pos: [6.84, 1.32, 1.18], target: [7.28, 1.06, 1.2], fov: 1.05 }),
-    robotFront: () => ({ pos: [4.25, 1.75, 2.75], target: [6.6, 1.45, 1.2] }),
-    panel: () => ({ pos: [5.72, 1.42, 3.42], target: [7.3, 1.15, 2.45], fov: 0.9 }),
-    panelWide: () => ({ pos: [4.3, 2.3, 4.9], target: [6.9, 1.0, 1.9] }),
+    robot: () => ({ pos: [2.55, 2.1, -0.3], target: [4.2, 1.05, 1.2] }),
+    terminal: () => ({ pos: [3.54, 1.32, 1.18], target: [3.98, 1.06, 1.2], fov: 1.05 }),
+    robotFront: () => ({ pos: [2.0, 1.75, 3.7], target: [3.3, 1.45, 1.2] }),
+    panel: () => ({ pos: [2.42, 1.42, 3.42], target: [4.0, 1.15, 2.45], fov: 0.9 }),
+    panelWide: () => ({ pos: [2.0, 2.3, 5.5], target: [3.6, 1.0, 1.9] }),
     side: () => ({ pos: [-16, 3.2, 9], target: [0, 1.3, 7] }),
     aerial: () => ({ pos: [34, 48, -42], target: [2, 0, 12] }),
     tower: () => ({ pos: [-15, 7, -13], target: [0, 7.5, 9] }),
@@ -26,7 +26,7 @@
       return { pos: [p[0] - 6.5 + Math.min(rise, 4), Math.max(1.4, p[1] - 2.2), p[2] - 8.5 + Math.min(rise, 3)], target: [p[0], p[1] + 0.5, p[2]], fov: 0.9 };
     },
     bowlingLane: () => ({ pos: [10.5, 3.2, -6.5], target: [2.6, 0.9, 0.4] }),
-    bowlingLanding: () => ({ pos: [5.55, 1.6, -2.7], target: [5.75, 0.95, 1.0], fov: 0.85 }),
+    bowlingLanding: () => ({ pos: [8.5, 1.7, -2.5], target: [4.0, 0.95, -0.4], fov: 0.85 }),
     idleOrbit: (w) => {
       const a = w.t * 0.045 + 3.9;
       return { pos: [2.5 + Math.cos(a) * 16, 8.6 + Math.sin(w.t * 0.07) * 1.2, 3 + Math.sin(a) * 16], target: [2.6, 1.0, 3.5] };
