@@ -99,6 +99,7 @@
       this.clouds = sc.clouds;
       this.poles = sc.poles;
       this.foliage = sc.foliage;   // rocks, bushes and flowers
+      this.trees = sc.trees;
       scene.add(M.track(R, -320, 340));
 
       // granny
