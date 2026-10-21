@@ -6,7 +6,7 @@ This is a general-purpose, customizable implementation of the viral "Granny Benc
 
 Zero install required, runs entirely in-browser after downloading. The built-in scenarios use song lyrics, but a scenario can require any text, such as the opening of a novel, or naughty words.
 
-Supports the APIs for Claude, ChatGPT, or Gemini.
+Supports the APIs for Claude, ChatGPT, Gemini, or any other OpenAI-Compatible API.
 
 ## Screenshot
 <img width="2000" src="https://github.com/user-attachments/assets/7c1d6c40-d6f8-4f2b-9e01-9974e81118e8" />
