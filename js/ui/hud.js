@@ -9,6 +9,17 @@
     impact: 'Impact', done: 'Run finished', aborted: 'Stopped', error: 'Error', supervisor: 'Incoming supervisor message',
   };
 
+  // Vertical video (9:16): the part of the frame TikTok and Instagram leave uncovered, as fractions of its width
+  // and height. Below `split` their buttons take the right side, so the right edge moves in to `rLow`.
+  const SAFE = { l: 0.0533, t: 0.13, r: 0.9458, rLow: 0.8142, split: 0.387, b: 0.76 };
+  // The covered areas, for the guide: [color, left, top, width, height] in percent of the frame. Red and orange
+  // hide what is behind them, yellow only partly.
+  const COVERED = [
+    ['red', 0, 0, 100, 6.6], ['red', 0, 6.6, 4.44, 93.4], ['red', 95.56, 6.6, 4.44, 93.4], ['red', 4.44, 83.9, 77.07, 16.1],
+    ['orange', 4.44, 6.6, 91.12, 6.4], ['orange', 81.51, 45.8, 14.05, 54.2],
+    ['yellow', 4.44, 13, 0.89, 70.9], ['yellow', 94.58, 13, 0.98, 25.7], ['yellow', 81.42, 38.7, 14.14, 7.1], ['yellow', 5.33, 76, 76.18, 7.9],
+  ];
+
   const HUD = {
     el: {},
     state: { vt: 0, T: 60 },
@@ -20,6 +31,9 @@
         turn: $('hud-turn'), phase: $('hud-phase'), model: $('hud-model'), altitude: $('hud-altitude'), flash: $('flash'),
         frozen: $('hud-frozen'), verdict: $('hud-verdict'), fps: $('hud-fps'), demo: $('hud-demo'),
       };
+      // The guide to the covered areas (vertical video, Graphics & camera).
+      const guide = $('safe-guide');
+      for (const [cls, l, t, w, hh] of COVERED) guide.appendChild(h('div.' + cls, { style: { left: l + '%', top: t + '%', width: w + '%', height: hh + '%' } }));
       this.idle();
     },
 
@@ -245,7 +259,12 @@
       // Bubbles stay below the HUD at the top (clock, demo banner, phase), so it is never covered.
       const cr = this.container.getBoundingClientRect(), hr = document.getElementById('hud').getBoundingClientRect();
       const hudL = hr.left - cr.left, hudR = hr.right - cr.left, hudB = hr.bottom - cr.top + 8;
-      let dockY = H - 18;
+      // Vertical video: they stay in the part of the frame TikTok and Instagram leave uncovered (SAFE).
+      const vertical = document.body.classList.contains('vertical');
+      const sL = vertical ? W * SAFE.l + 3 : 8, sT = vertical ? H * SAFE.t : 64, sB = vertical ? H * SAFE.b : H - 8;
+      const sR = (bottom) => (vertical ? W * (bottom > H * SAFE.split ? SAFE.rLow : SAFE.r) - 3 : W - 8);
+      const vMaxW = Math.floor(W * (SAFE.rLow - SAFE.l)) - 4 + 'px';
+      let dockY = vertical ? sB : H - 18;
       // Docked bubbles stay clear of the widgets in the bottom-left corner (model name, camera buttons).
       let inset = 12;
       for (const id of ['hud-model', 'cam-controls']) {
@@ -257,6 +276,8 @@
       const pc = document.getElementById('play-controls');
       if (pc && pc.offsetParent) insetR = Math.max(insetR, W - pc.offsetLeft + 12);
       if (insetR > W * 0.45) insetR = 12;
+      if (vertical) { inset = sL; insetR = W - W * SAFE.rLow + 3; }   // the buttons are beside the frame
+      const mid = vertical ? (sL + W * SAFE.rLow) / 2 : W / 2;
       for (const who of ['narrator', 'robot', 'granny']) {
         const it = this.items[who];
         if (!it.visible) continue;
@@ -265,6 +286,7 @@
           else if (gliding) it.el.classList.add('fading');   // the line is over and the camera moves on
           continue;
         }
+        if (vertical && it.el.style.maxWidth !== vMaxW) it.el.style.maxWidth = vMaxW;
         const bw = it.el.offsetWidth, bh = it.el.offsetHeight;
         let docked = who === 'narrator', below = false;
         let x = 0, y = 0;
@@ -273,8 +295,8 @@
           // stays put while the speaker sways and the camera moves or shakes. Its tail follows the head.
           this.world.project(anchors[who + 'Seat'], tmp, rest);
           docked = tmp.behind || tmp.x < -40 || tmp.x > W + 40 || tmp.y < 30 || tmp.y > H + 20;
-          x = U.clamp(tmp.x - bw / 2, 8, W - bw - 8);
-          const top = x < hudR && x + bw > hudL ? hudB : 64;   // it may not go higher (or cover the HUD)
+          x = U.clamp(tmp.x - bw / 2, sL, sR(0) - bw);
+          const top = x < hudR && x + bw > hudL ? Math.max(hudB, sT) : sT;   // it may not go higher (or cover the HUD)
           y = tmp.y - bh - 14;
           // No room above the head: it goes below the chin, with its tail pointing up. (Once below, it needs
           // clearly more room to go back above, so it does not flip between the two.)
@@ -282,12 +304,13 @@
             this.world.project(anchors[who + 'SeatChin'], tmp, rest);
             below = true;
             y = tmp.y + 14;
-            if (y + bh > H - 8) { docked = true; below = false; }   // no room below either
+            if (y + bh > sB) { docked = true; below = false; }   // no room below either
           }
-          y = U.clamp(y, top, H - bh - 8);
+          y = U.clamp(y, top, sB - bh);
+          x = U.clamp(x, sL, sR(y + bh) - bw);   // in vertical video the right edge depends on how low it is
         }
         if (docked) {
-          x = U.clamp((W - bw) / 2, inset, Math.max(inset, W - bw - insetR));
+          x = U.clamp(mid - bw / 2, inset, Math.max(inset, W - bw - insetR));
           y = dockY - bh;
           dockY = y - 8;
         }
@@ -299,11 +322,11 @@
         it.snap = false;
         x = it.pos.x; y = it.pos.y;
         if (!docked) {
-          if (x < hudR && x + bw > hudL) y = Math.min(Math.max(y, hudB), H - bh - 8);
+          if (x < hudR && x + bw > hudL) y = Math.min(Math.max(y, hudB), sB - bh);
           this.world.project(anchors[below ? who + 'Chin' : who], head);
           it.el.style.setProperty('--tail', U.clamp(head.x - x, 18, bw - 18) + 'px');
         }
-        const maxW = docked ? Math.max(240, Math.min(720, W - inset - insetR - 4)) + 'px' : '';
+        const maxW = vertical ? vMaxW : docked ? Math.max(240, Math.min(720, W - inset - insetR - 4)) + 'px' : '';
         if (it.el.style.maxWidth !== maxW) it.el.style.maxWidth = maxW;
         it.el.classList.toggle('docked', docked);
         it.el.classList.toggle('below', below);

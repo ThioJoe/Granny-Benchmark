@@ -41,34 +41,40 @@
 
   <div id="main">
     <main id="stage">
-      <canvas id="view" tabindex="0" aria-label="3D view of Grandma, the train, and the AI's terminal"></canvas>
-      <div id="flash"></div>
-      <div id="frozen-overlay"><div class="frozen-label">TIME FROZEN<span>the AI is thinking</span></div></div>
-      <div id="bubbles"></div>
+      <!-- The 3D view and everything drawn over it (a 9:16 frame in vertical video mode). -->
+      <div id="frame">
+        <canvas id="view" tabindex="0" aria-label="3D view of Grandma, the train, and the AI's terminal"></canvas>
+        <div id="flash"></div>
+        <div id="frozen-overlay"><div class="frozen-label">TIME FROZEN<span>the AI is thinking</span></div></div>
+        <div id="bubbles"></div>
 
-      <div id="hud">
-        <div class="hud-top">
-          <div id="hud-clock-box" class="clock-box">
-            <div id="hud-clock" class="clock">01:00.0</div>
-            <div class="clock-label">until impact</div>
-          </div>
-          <div class="track-meter">
-            <div class="meter-bar">
-              <span class="meter-granny" title="Grandma">&#128117;</span>
-              <span id="hud-train" class="meter-train" title="Train">&#128642;</span>
+        <div id="hud">
+          <div class="hud-top">
+            <div id="hud-clock-box" class="clock-box">
+              <div id="hud-clock" class="clock">01:00.0</div>
+              <div class="clock-label">until impact</div>
             </div>
-            <div class="meter-row"><span id="hud-turn">Turn -</span><span id="hud-dist">160 m</span></div>
+            <div class="track-meter">
+              <div class="meter-bar">
+                <span class="meter-granny" title="Grandma">&#128117;</span>
+                <span id="hud-train" class="meter-train" title="Train">&#128642;</span>
+              </div>
+              <div class="meter-row"><span id="hud-turn">Turn -</span><span id="hud-dist">160 m</span></div>
+            </div>
           </div>
+          <div id="hud-demo" class="demo-banner hidden" role="status">DEMO MODE (NO AI) - SCRIPTED RESPONSES</div>
+          <div class="hud-phase-row">
+            <span id="hud-phase" class="phase" data-phase="idle">Ready</span>
+            <span id="hud-verdict" class="verdict-chip hidden"></span>
+          </div>
+          <div id="hud-altitude" class="altitude hidden"></div>
         </div>
-        <div id="hud-demo" class="demo-banner hidden" role="status">DEMO MODE (NO AI) - SCRIPTED RESPONSES</div>
-        <div class="hud-phase-row">
-          <span id="hud-phase" class="phase" data-phase="idle">Ready</span>
-          <span id="hud-verdict" class="verdict-chip hidden"></span>
-        </div>
-        <div id="hud-altitude" class="altitude hidden"></div>
+        <div id="hud-model" class="hud-model hidden"></div>
+        <div id="hud-fps" class="fps hidden"></div>
+        <div id="result-card" class="hidden" role="status"></div>
+        <div id="webgl-error" class="hidden"></div>
+        <div id="safe-guide" class="hidden" aria-hidden="true"></div>
       </div>
-      <div id="hud-model" class="hud-model hidden"></div>
-      <div id="hud-fps" class="fps hidden"></div>
 
       <div id="play-controls" aria-label="Voice controls">
         <button id="btn-ff" type="button" title="Speed up the rest of the line being spoken, 1.5x per press (.)" disabled>&#9193;<span class="pc-label"> Faster line</span></button>
@@ -86,9 +92,6 @@
         <select id="cam-preset" aria-label="Camera view"></select>
         <span id="cam-hint" class="hint"></span>
       </div>
-
-      <div id="result-card" class="hidden" role="status"></div>
-      <div id="webgl-error" class="hidden"></div>
     </main>
 
     <aside id="panel" aria-label="Run setup and transcript">

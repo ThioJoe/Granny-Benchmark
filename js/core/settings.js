@@ -77,7 +77,7 @@
         subtitles: true,
       },
       audio: { enabled: true, volume: 0.7, music: true },
-      graphics: { shadows: true, pixelRatioCap: 1.75, showFps: false },
+      graphics: { shadows: true, pixelRatioCap: 1.75, showFps: false, vertical: false, safeGuide: false },
       camera: { autoDirector: true, invertY: false, sensitivity: 1 },
       security: { autoLoadConfigFile: false, stayUnlockedInTab: true },
       ui: { panelOpen: true, tab: 'arena', panelWidth: null },

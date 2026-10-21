@@ -281,9 +281,18 @@ void main() {
       }
     }
 
+    // Vertical field of view for a view of this shape. The shots are made for a wide view, so a view taller than it
+    // is wide (such as the 9:16 frame for vertical video) gets a wider field of view: 60% of what a 16:9 view
+    // would show across, instead of a narrow slice.
+    fovFor(fov, aspect) {
+      if (aspect >= 1) return fov;
+      const across = 0.6 * 2 * Math.atan(Math.tan(fov / 2) * 16 / 9);
+      return Math.max(fov, 2 * Math.atan(Math.tan(across / 2) / aspect));
+    }
+
     _updateCamera(cam) {
       const aspect = this.canvas.width / Math.max(1, this.canvas.height);
-      m4.perspective(this.proj, cam.fov || 0.96, aspect, cam.near || 0.1, cam.far || 1500);
+      m4.perspective(this.proj, this.fovFor(cam.fov || 0.96, aspect), aspect, cam.near || 0.1, cam.far || 1500);
       m4.lookAt(this.view, cam.position, cam.target, cam.up || [0, 1, 0]);
       m4.multiply(this.viewProj, this.proj, this.view);
       m4.invert(this.invViewProj, this.viewProj);
@@ -449,7 +458,7 @@ void main() {
     // View-projection matrix for a camera pose other than the current one ({ position, target, fov }).
     viewProjFor(cam) {
       const aspect = this.canvas.width / Math.max(1, this.canvas.height);
-      const proj = m4.perspective(m4.create(), cam.fov || 0.96, aspect, cam.near || 0.1, cam.far || 1500);
+      const proj = m4.perspective(m4.create(), this.fovFor(cam.fov || 0.96, aspect), aspect, cam.near || 0.1, cam.far || 1500);
       const view = m4.lookAt(m4.create(), cam.position, cam.target, cam.up || [0, 1, 0]);
       return m4.multiply(m4.create(), proj, view);
     }

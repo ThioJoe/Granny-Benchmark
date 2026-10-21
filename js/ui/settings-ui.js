@@ -440,6 +440,10 @@
         F.check(g, 'shadows', 'Shadows', { onChange: apply }),
         F.field('Resolution limit (device pixel ratio)', F.range(g, 'pixelRatioCap', { min: 0.5, max: 3, step: 0.25, fmt: (x) => x.toFixed(2) + 'x', onChange: apply }), 'Lower it if the 3D view is slow.'),
         F.check(g, 'showFps', 'Show frame rate'),
+        F.check(g, 'vertical', 'Vertical video (9:16)', { onChange: () => { GB.App.applyFrame(); this._renderGraphics(); },
+          hint: 'For recording vertical video. The 3D view becomes a 9:16 frame, and the clock, speech bubbles, and other text stay out of the areas TikTok and Instagram cover with their buttons and captions. A page cannot resize its own browser window, so the frame is fitted inside it; the camera and voice buttons go beside it.' }),
+        g.vertical ? F.check(g, 'safeGuide', 'Show the covered areas', { onChange: () => GB.App.applyFrame(),
+          hint: 'Red and orange: covered by TikTok and Instagram. Yellow: partly covered. For checking only; turn it off before recording.' }) : null,
         F.check(c, 'autoDirector', 'Start with the automatic camera'),
         F.check(c, 'invertY', 'Invert vertical mouse look', { onChange: applyCam }),
         F.field('Mouse sensitivity', F.range(c, 'sensitivity', { min: 0.2, max: 3, step: 0.1, fmt: (x) => x.toFixed(1) + 'x', onChange: applyCam }))));

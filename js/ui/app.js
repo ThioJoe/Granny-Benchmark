@@ -42,6 +42,8 @@
       GB.VarsUI.init();
       this._bindTopbar();
       this._bindPanelResize();
+      this.applyFrame();
+      if (window.ResizeObserver) new ResizeObserver(() => this.applyFrame()).observe(U.$('#stage'));
       this._bindArena();
       this._bindCamera();
       this._bindVoiceControls();
@@ -198,6 +200,21 @@
         else GB.ConfigUI.open('keys');
       });
       this._muteIcon();
+    },
+
+    // Graphics & camera, "Vertical video (9:16)": the 3D view becomes the largest 9:16 frame that fits in the
+    // stage, in the middle; the bars beside it hold the camera and voice buttons (--bar-w).
+    applyFrame() {
+      const g = S.data.graphics, stage = U.$('#stage'), frame = U.$('#frame');
+      document.body.classList.toggle('vertical', !!g.vertical);
+      U.$('#safe-guide').classList.toggle('hidden', !(g.vertical && g.safeGuide));
+      if (!g.vertical) { frame.removeAttribute('style'); stage.style.removeProperty('--bar-w'); stage.style.removeProperty('--ui-scale'); return; }
+      const sw = stage.clientWidth, sh = stage.clientHeight;
+      let w = Math.floor(sh * 9 / 16), fh = sh;
+      if (w > sw) { w = sw; fh = Math.floor(sw * 16 / 9); }
+      Object.assign(frame.style, { left: Math.floor((sw - w) / 2) + 'px', top: Math.floor((sh - fh) / 2) + 'px', width: w + 'px', height: fh + 'px' });
+      stage.style.setProperty('--bar-w', Math.floor((sw - w) / 2) + 'px');
+      stage.style.setProperty('--ui-scale', U.clamp(fh / 846, 0.5, 1.4).toFixed(3));   // text over the frame scales with it
     },
 
     // The Arena side panel: drag its left edge to make it wider (saved; double-click for the default).

@@ -147,6 +147,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 /* ---------- main layout ---------- */
 #main { position: relative; flex: 1; min-height: 0; display: flex; }
 #stage { position: relative; flex: 1; min-width: 0; overflow: hidden; background: #a9c8e6; container: stage / inline-size; }
+#frame { position: absolute; inset: 0; }
 #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; cursor: grab; transition: filter 0.6s; }
 #view:active { cursor: grabbing; }
 #panel {
@@ -354,6 +355,38 @@ body.running #cam-controls .hint { display: none; }
 .rc-message { text-align: left; white-space: pre-wrap; font-family: var(--mono); font-size: 12.5px; color: #ffd2cd; background: #1b0f12; border: 1px solid #5e1f1d; border-radius: 10px; padding: 10px 12px; margin: 10px 0 12px; max-height: 42vh; overflow-y: auto; }
 
 #webgl-error { position: absolute; inset: auto 16px 70px 16px; background: rgba(40, 14, 14, 0.92); border: 1px solid #6b2a2c; padding: 12px 14px; border-radius: 10px; z-index: 5; }
+
+/* ---------- vertical video (Graphics & camera) ----------
+   The 3D view is a 9:16 frame in the middle of the stage (sized in app.js). What matters stays out of the areas
+   TikTok and Instagram cover: the top 13%, the bottom 24%, the edges, and the right side below 39% (their
+   buttons). See SAFE and COVERED in hud.js. The camera and voice buttons go beside the frame. Text drawn over the
+   frame scales with it (--ui-scale is 1 for an 846 px tall frame), so recordings look the same at any size. */
+body.vertical #stage { background: #07080b; }
+body.vertical #frame { right: auto; bottom: auto; overflow: hidden; }
+body.vertical #hud { top: calc(13% + 6px); width: calc((89% - 12px) / var(--ui-scale, 1)); transform: translateX(-50%) scale(var(--ui-scale, 1)); transform-origin: 50% 0; }
+body.vertical .demo-banner { font-size: 14px; min-height: 0; padding: 5px 22px; background-size: 20px 100%, 20px 100%; }
+body.vertical .hud-model { left: 5.4%; bottom: calc(16.1% + 2px); max-width: calc(74% / var(--ui-scale, 1)); padding: 3px 9px; transform: scale(var(--ui-scale, 1)); transform-origin: 0 100%; }
+body.vertical .hud-model .hm-name { font-size: 13px; }
+body.vertical .frozen-label { left: 43.4%; bottom: calc(24% + 8px); transform: translateX(-50%) scale(var(--ui-scale, 1)); transform-origin: 50% 100%; }
+body.vertical .bubble { font-size: calc(14.5px * var(--ui-scale, 1)); padding: calc(9px * var(--ui-scale, 1)) calc(13px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1)); border-radius: calc(14px * var(--ui-scale, 1)); }
+body.vertical .bubble.robot { font-size: calc(13px * var(--ui-scale, 1)); }
+body.vertical .bubble-name { font-size: calc(10.5px * var(--ui-scale, 1)); }
+body.vertical #result-card { left: 43.4%; top: auto; bottom: calc(24% + 6px); transform: translateX(-50%) scale(var(--ui-scale, 1)); transform-origin: 50% 100%; animation-name: pop-v; width: calc((76% - 10px) / var(--ui-scale, 1)); max-height: calc((63% - 10px) / var(--ui-scale, 1)); overflow-y: auto; padding: 12px; }
+@keyframes pop-v { from { transform: translateX(-50%) scale(calc(0.85 * var(--ui-scale, 1))); opacity: 0; } }
+body.vertical .rc-title { font-size: 21px; }
+body.vertical .rc-model { margin: 2px 0 4px; font-size: 13px; }
+body.vertical .rc-sub { font-size: 13.5px; margin-bottom: 8px; }
+body.vertical .rc-stats { gap: 5px; margin-bottom: 10px; }
+body.vertical .rc-stats div { padding: 4px 2px; }
+body.vertical .rc-stats b { font-size: 15px; }
+body.vertical #cam-controls { max-width: calc(var(--bar-w, 300px) - 24px); }
+body.vertical #cam-controls .hint { display: none; }
+body.vertical #play-controls { max-width: calc(var(--bar-w, 300px) - 24px); flex-wrap: wrap; justify-content: flex-end; }
+#safe-guide { position: absolute; inset: 0; pointer-events: none; z-index: 9; }
+#safe-guide div { position: absolute; }
+#safe-guide .red { background: rgba(255, 0, 0, 0.38); }
+#safe-guide .orange { background: rgba(255, 136, 0, 0.38); }
+#safe-guide .yellow { background: rgba(255, 255, 0, 0.34); }
 
 /* ---------- pages ---------- */
 .page { position: absolute; inset: 0; overflow-y: auto; background: var(--bg); z-index: 20; }
